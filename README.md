@@ -41,8 +41,8 @@ When coordinating multiple children across separate shared Google Calendars:
 
 ### 1. Clone & Install
 ```bash
-git clone https://github.com/danielherrington/childcare-schedule-helper.git
-cd childcare-schedule-helper
+git clone https://github.com/danielherrington/family-schedule-helper.git
+cd family-schedule-helper
 npm install
 ```
 
