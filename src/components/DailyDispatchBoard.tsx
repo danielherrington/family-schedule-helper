@@ -1,0 +1,156 @@
+import React, { useState } from 'react';
+import { useSchedule } from '../context/ScheduleContext';
+import { EventCard } from './EventCard';
+import { HolidayModal } from './HolidayModal';
+import { Filter, Calendar, CheckCircle2, AlertTriangle, Plus, Palmtree } from 'lucide-react';
+
+export const DailyDispatchBoard: React.FC = () => {
+  const { events, selectedDate, children: childrenList, holidays, setIsSetupOpen, setActiveSetupTab } = useSchedule();
+  const [selectedChildFilter, setSelectedChildFilter] = useState<string>('all');
+  const [isHolidayModalOpen, setIsHolidayModalOpen] = useState<boolean>(false);
+
+  const dayEvents = events
+    .filter((e) => {
+      const matchesDate = e.date === selectedDate;
+      const matchesChild = selectedChildFilter === 'all' || e.childId === selectedChildFilter || e.childId === 'all';
+      return matchesDate && matchesChild;
+    })
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+  const totalAssigned = dayEvents.filter((e) => e.assignedTo !== 'unassigned' && e.status !== 'cancelled').length;
+  const totalUnassigned = dayEvents.filter((e) => e.assignedTo === 'unassigned' && e.status !== 'cancelled').length;
+  const totalCancelled = dayEvents.filter((e) => e.status === 'cancelled').length;
+
+  const activeHoliday = holidays.find((h) => h.date === selectedDate);
+
+  return (
+    <div>
+      {/* Day-level Holiday Banner if active */}
+      {activeHoliday && (
+        <div 
+          style={{
+            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(59, 130, 246, 0.15) 100%)',
+            border: '1px solid rgba(16, 185, 129, 0.4)',
+            borderRadius: '12px',
+            padding: '12px 18px',
+            marginBottom: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Palmtree size={22} color="#10b981" />
+            <div>
+              <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#10b981' }}>
+                🌴 Day Off / Holiday: {activeHoliday.name}
+              </div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                School drop-offs & pick-ups cancelled for this day. Recurring schedule remains active for next week.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Top Filter & Summary Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <Filter size={16} color="var(--text-muted)" />
+          <button
+            className={`btn ${selectedChildFilter === 'all' ? 'btn-primary' : ''}`}
+            style={{ padding: '6px 14px', fontSize: '0.85rem' }}
+            onClick={() => setSelectedChildFilter('all')}
+          >
+            All Kids ({events.filter((e) => e.date === selectedDate).length})
+          </button>
+          {childrenList.map((ch) => {
+            const count = events.filter((e) => e.date === selectedDate && (e.childId === ch.id || e.childId === 'all')).length;
+            const isSelected = selectedChildFilter === ch.id;
+            return (
+              <button
+                key={ch.id}
+                className={`btn ${isSelected ? 'btn-primary' : ''}`}
+                style={{
+                  padding: '6px 14px',
+                  fontSize: '0.85rem',
+                  borderColor: isSelected ? ch.color : undefined,
+                  background: isSelected ? ch.color : undefined,
+                  color: isSelected ? '#fff' : undefined
+                }}
+                onClick={() => setSelectedChildFilter(ch.id)}
+              >
+                {ch.name} ({count})
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Action Controls & Stats */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <button
+            className="btn"
+            style={{ borderColor: 'rgba(16, 185, 129, 0.4)', color: '#10b981' }}
+            onClick={() => setIsHolidayModalOpen(true)}
+            title="Mark this day as a holiday or no classes"
+          >
+            <Palmtree size={15} />
+            <span>Mark Holiday / Day Off</span>
+          </button>
+
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--success)', fontSize: '0.85rem' }}>
+            <CheckCircle2 size={15} />
+            <span><strong>{totalAssigned}</strong> Active</span>
+          </span>
+          {totalUnassigned > 0 && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--danger)', fontWeight: 700, fontSize: '0.85rem' }}>
+              <AlertTriangle size={15} />
+              <span><strong>{totalUnassigned}</strong> Unassigned</span>
+            </span>
+          )}
+          {totalCancelled > 0 && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+              <Palmtree size={15} />
+              <span><strong>{totalCancelled}</strong> Off</span>
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Events List */}
+      {dayEvents.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '60px 20px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '16px' }}>
+          <Calendar size={36} color="var(--text-dim)" style={{ margin: '0 auto 12px auto' }} />
+          <div style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '6px' }}>No logistics scheduled for this day</div>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
+            You can generate the routine schedule from your weekly blueprint.
+          </p>
+          <button 
+            className="btn btn-primary"
+            onClick={() => {
+              setActiveSetupTab('blueprint');
+              setIsSetupOpen(true);
+            }}
+          >
+            <Plus size={16} />
+            <span>Open Event Blueprint</span>
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '16px' }}>
+          {dayEvents.map((evt) => (
+            <EventCard key={evt.id} event={evt} />
+          ))}
+        </div>
+      )}
+
+      {/* Holiday Modal */}
+      <HolidayModal
+        isOpen={isHolidayModalOpen}
+        onClose={() => setIsHolidayModalOpen(false)}
+        targetDateStr={selectedDate}
+      />
+    </div>
+  );
+};

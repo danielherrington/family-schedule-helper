@@ -1,0 +1,625 @@
+import React, { useState } from 'react';
+import { useSchedule } from '../context/ScheduleContext';
+import { 
+  X, 
+  Users, 
+  Smile, 
+  CalendarRange, 
+  Plus, 
+  Trash2, 
+  Check, 
+  Sparkles,
+  Clock,
+  MapPin,
+  HelpCircle,
+  Play
+} from 'lucide-react';
+
+export const SetupHubModal: React.FC = () => {
+  const { 
+    isSetupOpen, 
+    setIsSetupOpen, 
+    activeSetupTab, 
+    setActiveSetupTab,
+    caregivers,
+    children: childrenList,
+    templates,
+    addCaregiver,
+    deleteCaregiver,
+    addChild,
+    deleteChild,
+    addTemplate,
+    deleteTemplate,
+    applyWeeklyBlueprint,
+    selectedDate
+  } = useSchedule();
+
+  // Caregiver Form State
+  const [cgName, setCgName] = useState('');
+  const [cgRole, setCgRole] = useState('Parent / Manager');
+  const [cgColor, setCgColor] = useState('#3b82f6');
+  const [cgCalendar, setCgCalendar] = useState('');
+  const [cgIsManager, setCgIsManager] = useState(false);
+
+  // Child Form State
+  const [kidName, setKidName] = useState('');
+  const [kidColor, setKidColor] = useState('#a855f7');
+  const [kidSchool, setKidSchool] = useState('');
+
+  // Template Form State
+  const [tplTitle, setTplTitle] = useState('');
+  const [tplChildId, setTplChildId] = useState('izzy');
+  const [tplCategory, setTplCategory] = useState<'dropoff' | 'pickup' | 'activity'>('pickup');
+  const [tplDays, setTplDays] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [tplStartTime, setTplStartTime] = useState('15:00');
+  const [tplEndTime, setTplEndTime] = useState('15:30');
+  const [tplLocation, setTplLocation] = useState('');
+  const [tplDefaultCg, setTplDefaultCg] = useState('lucila');
+
+  if (!isSetupOpen) return null;
+
+  const handleCreateCaregiver = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cgName.trim()) return;
+    await addCaregiver({
+      name: cgName.trim(),
+      role: cgRole,
+      avatarColor: cgColor,
+      calendarId: cgCalendar.trim() || `${cgName.toLowerCase().replace(/[^a-z0-9]/g, '')}@herrington.ai`,
+      isManager: cgIsManager
+    });
+    setCgName('');
+    setCgCalendar('');
+  };
+
+  const handleCreateChild = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!kidName.trim()) return;
+    await addChild({
+      name: kidName.trim(),
+      color: kidColor,
+      school: kidSchool.trim() || 'School'
+    });
+    setKidName('');
+    setKidSchool('');
+  };
+
+  const handleToggleDay = (dayNum: number) => {
+    setTplDays((prev) => 
+      prev.includes(dayNum) ? prev.filter((d) => d !== dayNum) : [...prev, dayNum].sort()
+    );
+  };
+
+  const handleCreateTemplate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tplTitle.trim()) return;
+    await addTemplate({
+      title: tplTitle.trim(),
+      childId: tplChildId,
+      category: tplCategory,
+      daysOfWeek: tplDays,
+      startTime: tplStartTime,
+      endTime: tplEndTime,
+      location: tplLocation.trim() || 'School',
+      defaultCaregiverId: tplDefaultCg
+    });
+    setTplTitle('');
+    setTplLocation('');
+  };
+
+  const dayLabels = [
+    { num: 1, label: 'M' },
+    { num: 2, label: 'Tu' },
+    { num: 3, label: 'W' },
+    { num: 4, label: 'Th' },
+    { num: 5, label: 'F' },
+    { num: 6, label: 'Sa' },
+    { num: 7, label: 'Su' }
+  ];
+
+  return (
+    <div className="modal-overlay" onClick={() => setIsSetupOpen(false)}>
+      <div className="modal-card" style={{ maxWidth: '780px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
+        
+        {/* Header */}
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">Family Logistics Setup Hub</div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              Configure your Potential Caregivers, Potential Kids, and Weekly Routine Blueprint
+            </div>
+          </div>
+          <button className="nav-btn" onClick={() => setIsSetupOpen(false)}>
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Tab Switcher */}
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', background: 'var(--surface-card)', padding: '4px 16px 0 16px', gap: '8px' }}>
+          <button
+            className={`setup-tab-btn ${activeSetupTab === 'caregivers' ? 'active' : ''}`}
+            onClick={() => setActiveSetupTab('caregivers')}
+          >
+            <Users size={16} />
+            <span>1. Potential Caregivers ({caregivers.length})</span>
+          </button>
+          <button
+            className={`setup-tab-btn ${activeSetupTab === 'kids' ? 'active' : ''}`}
+            onClick={() => setActiveSetupTab('kids')}
+          >
+            <Smile size={16} />
+            <span>2. Potential Kids ({childrenList.length})</span>
+          </button>
+          <button
+            className={`setup-tab-btn ${activeSetupTab === 'blueprint' ? 'active' : ''}`}
+            onClick={() => setActiveSetupTab('blueprint')}
+          >
+            <CalendarRange size={16} />
+            <span>3. Event Blueprint ({templates.length})</span>
+          </button>
+        </div>
+
+        {/* Body Content */}
+        <div className="modal-body" style={{ overflowY: 'auto', flex: 1, padding: '20px' }}>
+          
+          {/* TAB 1: CAREGIVERS */}
+          {activeSetupTab === 'caregivers' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                💡 <strong>Potential Caregivers</strong> are the adults and helpers who take turns driving and managing pick-ups (Parents, Nannies, Grandparents). Each caregiver can have their shared Google Calendar ID linked.
+              </div>
+
+              {/* Existing Caregivers */}
+              <div>
+                <div style={{ fontSize: '0.9rem', fontWeight: 800, marginBottom: '10px' }}>Active Caregiver Roster:</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {caregivers.map((cg) => (
+                    <div 
+                      key={cg.id} 
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '12px 16px',
+                        background: 'var(--surface-card)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '10px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div className="avatar" style={{ backgroundColor: cg.avatarColor, width: '36px', height: '36px' }}>
+                          {cg.avatarInitials}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>
+                            {cg.name} {cg.isManager && <span style={{ fontSize: '0.75rem', background: 'var(--accent-alpha)', color: 'var(--accent)', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px' }}>Manager</span>}
+                          </div>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                            {cg.role} • <span style={{ fontFamily: 'var(--font-mono)' }}>{cg.calendarId}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <button 
+                        className="nav-btn"
+                        onClick={() => deleteCaregiver(cg.id)}
+                        title="Remove caregiver"
+                        style={{ color: 'var(--danger)' }}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Add New Caregiver Form */}
+              <form onSubmit={handleCreateCaregiver} style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '16px' }}>
+                <div style={{ fontWeight: 800, fontSize: '0.95rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Plus size={16} color="var(--accent)" />
+                  <span>Add New Potential Caregiver</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Full Name:</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. Babysitter Sarah"
+                      value={cgName}
+                      onChange={(e) => setCgName(e.target.value)}
+                      style={{ width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)' }}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Role:</label>
+                    <select
+                      value={cgRole}
+                      onChange={(e) => setCgRole(e.target.value)}
+                      style={{ width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)' }}
+                    >
+                      <option value="Parent / Manager">Parent / Manager</option>
+                      <option value="Nanny">Nanny</option>
+                      <option value="Grandparent">Grandparent</option>
+                      <option value="Babysitter / Driver">Babysitter / Driver</option>
+                      <option value="Family Helper">Family Helper</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: '12px', marginBottom: '16px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Google Calendar ID / Email:</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. family_sarah@herrington.ai"
+                      value={cgCalendar}
+                      onChange={(e) => setCgCalendar(e.target.value)}
+                      style={{ width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Color Theme:</label>
+                    <input 
+                      type="color" 
+                      value={cgColor}
+                      onChange={(e) => setCgColor(e.target.value)}
+                      style={{ width: '100%', height: '38px', padding: '2px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer' }}
+                    />
+                  </div>
+                </div>
+
+                <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
+                  <Plus size={16} />
+                  <span>Save Caregiver</span>
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* TAB 2: KIDS */}
+          {activeSetupTab === 'kids' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                💡 <strong>Potential Kids</strong> represents the children whose logistics, schools, and extracurricular schedules you coordinate.
+              </div>
+
+              {/* Existing Kids */}
+              <div>
+                <div style={{ fontSize: '0.9rem', fontWeight: 800, marginBottom: '10px' }}>Active Children:</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {childrenList.map((ch) => (
+                    <div 
+                      key={ch.id} 
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '12px 16px',
+                        background: 'var(--surface-card)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '10px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div 
+                          style={{
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: '10px',
+                            backgroundColor: ch.color,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#fff',
+                            fontWeight: 800,
+                            fontSize: '0.9rem'
+                          }}
+                        >
+                          {ch.name[0]}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{ch.name}</div>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{ch.school || 'School'}</div>
+                        </div>
+                      </div>
+
+                      <button 
+                        className="nav-btn"
+                        onClick={() => deleteChild(ch.id)}
+                        title="Remove child"
+                        style={{ color: 'var(--danger)' }}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Add Child Form */}
+              <form onSubmit={handleCreateChild} style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '16px' }}>
+                <div style={{ fontWeight: 800, fontSize: '0.95rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Plus size={16} color="var(--accent)" />
+                  <span>Add New Child</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 100px', gap: '12px', marginBottom: '16px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Child Name:</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. Leo"
+                      value={kidName}
+                      onChange={(e) => setKidName(e.target.value)}
+                      style={{ width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)' }}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>School / Program:</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. Montessori"
+                      value={kidSchool}
+                      onChange={(e) => setKidSchool(e.target.value)}
+                      style={{ width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Badge Color:</label>
+                    <input 
+                      type="color" 
+                      value={kidColor}
+                      onChange={(e) => setKidColor(e.target.value)}
+                      style={{ width: '100%', height: '38px', padding: '2px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer' }}
+                    />
+                  </div>
+                </div>
+
+                <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
+                  <Plus size={16} />
+                  <span>Save Child</span>
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* TAB 3: EVENT TEMPLATES (WEEKLY BLUEPRINT) */}
+          {activeSetupTab === 'blueprint' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px', fontSize: '0.85rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+                <div>
+                  💡 <strong>Event Blueprint</strong> is your master weekly routine (e.g. *"Vale Drop Off Mon–Fri"*, *"Izzy Gymnastics Tue/Thu"*).
+                </div>
+                <button 
+                  className="btn btn-primary" 
+                  onClick={() => applyWeeklyBlueprint('2026-08-31')}
+                  style={{ whiteSpace: 'nowrap' }}
+                >
+                  <Sparkles size={16} />
+                  <span>Apply Blueprint to Week</span>
+                </button>
+              </div>
+
+              {/* Existing Templates */}
+              <div>
+                <div style={{ fontSize: '0.9rem', fontWeight: 800, marginBottom: '10px' }}>
+                  Routine Weekly Blueprint ({templates.length} Repeating Events):
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {templates.map((tpl) => {
+                    const child = childrenList.find((c) => c.id === tpl.childId);
+                    const defCg = caregivers.find((c) => c.id === tpl.defaultCaregiverId);
+
+                    return (
+                      <div 
+                        key={tpl.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '12px 16px',
+                          background: 'var(--surface-card)',
+                          border: '1px solid var(--border)',
+                          borderRadius: '10px',
+                          gap: '12px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
+                          <span 
+                            className="child-badge" 
+                            style={{ 
+                              backgroundColor: child?.badgeBg || 'rgba(59, 130, 246, 0.15)',
+                              borderColor: child?.badgeBorder || 'rgba(59, 130, 246, 0.4)',
+                              color: child?.color || '#3b82f6'
+                            }}
+                          >
+                            {child?.name || tpl.childId}
+                          </span>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{tpl.title}</div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              <span>🕒 {tpl.startTime} - {tpl.endTime}</span>
+                              <span>📍 {tpl.location}</span>
+                              <span>👤 Default: <strong>{defCg?.name || tpl.defaultCaregiverId}</strong></span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Repeating Day Badges */}
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          {dayLabels.map((d) => (
+                            <span 
+                              key={d.num}
+                              style={{
+                                width: '22px',
+                                height: '22px',
+                                borderRadius: '4px',
+                                fontSize: '0.7rem',
+                                fontWeight: 700,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                background: tpl.daysOfWeek.includes(d.num) ? 'var(--accent)' : 'var(--surface)',
+                                color: tpl.daysOfWeek.includes(d.num) ? '#fff' : 'var(--text-dim)',
+                                border: '1px solid var(--border)'
+                              }}
+                            >
+                              {d.label}
+                            </span>
+                          ))}
+                        </div>
+
+                        <button 
+                          className="nav-btn"
+                          onClick={() => deleteTemplate(tpl.id)}
+                          title="Remove template"
+                          style={{ color: 'var(--danger)' }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Add Routine Template Form */}
+              <form onSubmit={handleCreateTemplate} style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '16px' }}>
+                <div style={{ fontWeight: 800, fontSize: '0.95rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Plus size={16} color="var(--accent)" />
+                  <span>Add New Routine Event to Blueprint</span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Event Title:</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. Vale Ballet Pick Up"
+                      value={tplTitle}
+                      onChange={(e) => setTplTitle(e.target.value)}
+                      style={{ width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)' }}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Child:</label>
+                    <select
+                      value={tplChildId}
+                      onChange={(e) => setTplChildId(e.target.value)}
+                      style={{ width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)' }}
+                    >
+                      {childrenList.map((ch) => (
+                        <option key={ch.id} value={ch.id}>{ch.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Category:</label>
+                    <select
+                      value={tplCategory}
+                      onChange={(e) => setTplCategory(e.target.value as any)}
+                      style={{ width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)' }}
+                    >
+                      <option value="dropoff">School Drop Off</option>
+                      <option value="pickup">School Pick Up</option>
+                      <option value="activity">Activity / Class</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Day Selection Checkboxes */}
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Repeating Days:</label>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {dayLabels.map((d) => {
+                      const isSelected = tplDays.includes(d.num);
+                      return (
+                        <button
+                          type="button"
+                          key={d.num}
+                          onClick={() => handleToggleDay(d.num)}
+                          style={{
+                            padding: '6px 14px',
+                            borderRadius: '6px',
+                            fontSize: '0.85rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            border: '1px solid',
+                            borderColor: isSelected ? 'var(--accent)' : 'var(--border)',
+                            background: isSelected ? 'var(--accent)' : 'var(--surface)',
+                            color: isSelected ? '#fff' : 'var(--text-muted)'
+                          }}
+                        >
+                          {d.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Start Time:</label>
+                    <input 
+                      type="time" 
+                      value={tplStartTime}
+                      onChange={(e) => setTplStartTime(e.target.value)}
+                      style={{ width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>End Time:</label>
+                    <input 
+                      type="time" 
+                      value={tplEndTime}
+                      onChange={(e) => setTplEndTime(e.target.value)}
+                      style={{ width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Location:</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. North Beach"
+                      value={tplLocation}
+                      onChange={(e) => setTplLocation(e.target.value)}
+                      style={{ width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Default Caregiver:</label>
+                    <select
+                      value={tplDefaultCg}
+                      onChange={(e) => setTplDefaultCg(e.target.value)}
+                      style={{ width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)' }}
+                    >
+                      {caregivers.map((cg) => (
+                        <option key={cg.id} value={cg.id}>{cg.name}</option>
+                      ))}
+                      <option value="unassigned">⚠️ Unassigned</option>
+                    </select>
+                  </div>
+                </div>
+
+                <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
+                  <Plus size={16} />
+                  <span>Save to Routine Blueprint</span>
+                </button>
+              </form>
+            </div>
+          )}
+
+        </div>
+
+        {/* Footer */}
+        <div className="modal-footer">
+          <button className="btn btn-primary" onClick={() => setIsSetupOpen(false)}>
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
