@@ -15,6 +15,14 @@ import {
   AlertCircle
 } from 'lucide-react';
 
+interface PositionedEvent {
+  event: DispatchEvent;
+  topPercent: number;
+  heightPercent: number;
+  columnIndex: number;
+  totalColumns: number;
+}
+
 export const VisualWeeklyCalendarGrid: React.FC = () => {
   const { 
     events, 
@@ -33,7 +41,6 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
 
   const [selectedChildFilter, setSelectedChildFilter] = useState<string>('all');
   const [holidayModalTargetDate, setHolidayModalTargetDate] = useState<string | null>(null);
-  const [activePopoverEventId, setActivePopoverEventId] = useState<string | null>(null);
 
   const weekDays = currentWeekDays.map((d) => ({
     dayName: format(d, 'EEEE'),
@@ -58,29 +65,102 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
     { hour: 19, label: '7 PM' }
   ];
 
-  // Calculate top & height percentage based on 7:00 AM (420 min) to 7:00 PM (1140 min)
-  const calculatePosition = (startTimeStr: string, endTimeStr: string) => {
-    const [startH, startM] = startTimeStr.split(':').map(Number);
-    const [endH, endM] = (endTimeStr || startTimeStr).split(':').map(Number);
-
-    const startTotalMin = startH * 60 + startM;
-    const endTotalMin = endH * 60 + endM;
+  // Robust Overlap & Column Layout Algorithm (Google Calendar interval graph style)
+  const layoutDayEvents = (dayEventsList: DispatchEvent[]): PositionedEvent[] => {
+    if (dayEventsList.length === 0) return [];
 
     const windowStart = 7 * 60; // 7:00 AM = 420 min
     const windowDuration = 12 * 60; // 12 hours = 720 min
 
-    const topPercent = Math.max(0, ((startTotalMin - windowStart) / windowDuration) * 100);
-    const durationMin = Math.max(30, endTotalMin - startTotalMin);
-    const heightPercent = (durationMin / windowDuration) * 100;
+    // 1. Sort events by start time, then duration descending
+    const sorted = [...dayEventsList].sort((a, b) => {
+      if (a.startTime !== b.startTime) {
+        return a.startTime.localeCompare(b.startTime);
+      }
+      return b.endTime.localeCompare(a.endTime);
+    });
 
-    return { topPercent, heightPercent };
+    // 2. Parse times to minutes
+    const parsed = sorted.map((event) => {
+      const [sH, sM] = event.startTime.split(':').map(Number);
+      const [eH, eM] = (event.endTime || event.startTime).split(':').map(Number);
+      const startMin = sH * 60 + sM;
+      const endMin = Math.max(startMin + 30, eH * 60 + eM);
+      return { event, startMin, endMin };
+    });
+
+    // 3. Cluster overlapping events
+    const clusters: typeof parsed[] = [];
+    let currentCluster: typeof parsed = [];
+    let clusterEnd = -1;
+
+    for (const item of parsed) {
+      if (currentCluster.length === 0) {
+        currentCluster.push(item);
+        clusterEnd = item.endMin;
+      } else if (item.startMin < clusterEnd) {
+        // Overlaps with current cluster
+        currentCluster.push(item);
+        clusterEnd = Math.max(clusterEnd, item.endMin);
+      } else {
+        // Break to new cluster
+        clusters.push(currentCluster);
+        currentCluster = [item];
+        clusterEnd = item.endMin;
+      }
+    }
+    if (currentCluster.length > 0) {
+      clusters.push(currentCluster);
+    }
+
+    // 4. In each cluster, assign sub-columns
+    const result: PositionedEvent[] = [];
+
+    for (const cluster of clusters) {
+      const columns: (typeof parsed)[] = [];
+
+      for (const item of cluster) {
+        let placed = false;
+        for (let c = 0; c < columns.length; c++) {
+          const lastInCol = columns[c][columns[c].length - 1];
+          if (lastInCol.endMin <= item.startMin) {
+            columns[c].push(item);
+            placed = true;
+            break;
+          }
+        }
+        if (!placed) {
+          columns.push([item]);
+        }
+      }
+
+      const totalColumns = columns.length;
+
+      for (let c = 0; c < totalColumns; c++) {
+        for (const item of columns[c]) {
+          const topPercent = Math.max(0, ((item.startMin - windowStart) / windowDuration) * 100);
+          const durationMin = Math.max(30, item.endMin - item.startMin);
+          const heightPercent = (durationMin / windowDuration) * 100;
+
+          result.push({
+            event: item.event,
+            topPercent,
+            heightPercent,
+            columnIndex: c,
+            totalColumns
+          });
+        }
+      }
+    }
+
+    return result;
   };
 
   // Detect conflicts (two events on same date, same driver, overlapping time)
   const isEventConflicted = (event: DispatchEvent) => {
-    if (event.assignedTo === 'unassigned' || event.status === 'cancelled') return false;
+    if (event.assignedTo === 'unassigned' || event.status === 'cancelled' || event.status === 'no_pickup_needed') return false;
     return events.some((other) => {
-      if (other.id === event.id || other.date !== event.date || other.assignedTo !== event.assignedTo || other.status === 'cancelled') {
+      if (other.id === event.id || other.date !== event.date || other.assignedTo !== event.assignedTo || other.status === 'cancelled' || other.status === 'no_pickup_needed') {
         return false;
       }
       return other.startTime < event.endTime && event.startTime < other.endTime;
@@ -121,7 +201,7 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
         <div style={{ display: 'flex', gap: '8px' }}>
           <button 
             className="btn"
-            onClick={() => applyWeeklyBlueprint('2026-08-31')}
+            onClick={() => applyWeeklyBlueprint(weekDays[0].dateStr)}
             title="Refresh active week from routine blueprint"
           >
             <Sparkles size={15} color="var(--accent)" />
@@ -154,7 +234,7 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
                     <span className="day-number-label">{d.dateNum}</span>
                   </div>
                   {knownHoliday && !dayHoliday && (
-                    <span style={{ fontSize: '0.625rem', color: knownHoliday.category === 'jewish' ? '#c4b5fd' : '#93c5fd', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '85px' }}>
+                    <span style={{ fontSize: '0.625rem', color: knownHoliday.category === 'jewish' ? '#7C3AED' : '#00B4D8', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '95px' }}>
                       🌴 {knownHoliday.name.split('—')[0].trim()}
                     </span>
                   )}
@@ -163,7 +243,7 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
                 <button
                   type="button"
                   className="nav-btn"
-                  style={{ padding: '2px 4px', color: dayHoliday ? '#10b981' : knownHoliday ? '#c4b5fd' : 'var(--text-muted)' }}
+                  style={{ padding: '2px 4px', color: dayHoliday ? '#059669' : knownHoliday ? '#7C3AED' : 'var(--text-muted)' }}
                   onClick={() => setHolidayModalTargetDate(d.dateStr)}
                   title={dayHoliday ? `Holiday: ${dayHoliday.name}` : knownHoliday ? `Suggested: ${knownHoliday.name}` : 'Mark as holiday / day off'}
                 >
@@ -203,6 +283,7 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
               });
 
               const dayHoliday = holidays.find((h) => h.date === d.dateStr);
+              const positionedEvents = layoutDayEvents(dayEvents);
 
               return (
                 <div key={d.dateStr} className="calendar-day-column">
@@ -214,14 +295,16 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Render Event Blocks Positioned Proportionally */}
-                  {dayEvents.map((evt) => {
+                  {/* Render Event Blocks with Non-Overlapping Column Calculations */}
+                  {positionedEvents.map(({ event: evt, topPercent, heightPercent, columnIndex, totalColumns }) => {
                     const child = childrenList.find((c) => c.id === evt.childId);
-                    const assignedCg = caregivers.find((c) => c.id === evt.assignedTo);
-                    const { topPercent, heightPercent } = calculatePosition(evt.startTime, evt.endTime);
                     const isCancelled = evt.status === 'cancelled';
                     const isNoPickupNeeded = evt.status === 'no_pickup_needed';
                     const hasConflict = isEventConflicted(evt);
+
+                    // Sub-column horizontal placement
+                    const colWidthPct = 100 / totalColumns;
+                    const colLeftPct = columnIndex * colWidthPct;
 
                     return (
                       <div
@@ -229,15 +312,22 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
                         className={`calendar-event-block ${isCancelled ? 'is-cancelled' : ''} ${hasConflict ? 'has-conflict' : ''}`}
                         style={{
                           top: `${topPercent}%`,
-                          minHeight: `${Math.max(heightPercent, 5.5)}%`,
+                          minHeight: `${Math.max(heightPercent, 6.5)}%`,
+                          left: `calc(${colLeftPct}% + 2px)`,
+                          width: `calc(${colWidthPct}% - 4px)`,
                           borderLeftColor: isCancelled ? '#059669' : isNoPickupNeeded ? '#8B5CF6' : (child?.color || '#FF5E7E'),
-                          backgroundColor: isCancelled ? 'rgba(5, 150, 105, 0.08)' : isNoPickupNeeded ? 'rgba(139, 92, 246, 0.08)' : (child?.badgeBg || 'rgba(255, 94, 126, 0.08)')
+                          backgroundColor: '#FFFFFF',
+                          backgroundImage: isCancelled 
+                            ? 'linear-gradient(135deg, rgba(5, 150, 105, 0.06), rgba(5, 150, 105, 0.02))'
+                            : isNoPickupNeeded
+                            ? 'linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(139, 92, 246, 0.02))'
+                            : `linear-gradient(135deg, ${child?.badgeBg || 'rgba(255, 94, 126, 0.08)'}, rgba(255, 255, 255, 0.95))`
                         }}
                       >
                         {/* Event Header */}
                         <div className="cal-block-header">
                           <span className="cal-block-time">
-                            {evt.startTime} - {evt.endTime}
+                            {evt.startTime}
                           </span>
                           {hasConflict && (
                             <span className="conflict-badge" title="Driver Double-Booked!">
@@ -256,12 +346,15 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
                           )}
                         </div>
 
-                        {/* Title */}
-                        <div className={`cal-block-title ${isCancelled ? 'strikethrough' : ''}`}>
+                        {/* Title - Cleanly truncated and styled */}
+                        <div 
+                          className={`cal-block-title ${isCancelled ? 'strikethrough' : ''}`}
+                          title={evt.title}
+                        >
                           {evt.title}
                         </div>
 
-                        {evt.location && (
+                        {evt.location && totalColumns === 1 && (
                           <div className="cal-block-location">
                             <MapPin size={10} style={{ flexShrink: 0 }} />
                             <span>{evt.location}</span>
@@ -270,7 +363,7 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
 
                         {/* Caregiver Checkbox Selector Pills directly on block */}
                         {!isCancelled && (
-                          <div className="cal-block-caregivers">
+                          <div className="cal-block-caregivers" style={{ flexWrap: totalColumns > 1 ? 'wrap' : 'nowrap' }}>
                             {caregivers.map((cg) => {
                               const isSelected = evt.assignedTo === cg.id && !isNoPickupNeeded;
                               return (
@@ -284,9 +377,12 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
                                   }}
                                   title={`Assign to ${cg.name}`}
                                   style={{
-                                    borderColor: isSelected ? cg.avatarColor : undefined,
-                                    background: isSelected ? cg.avatarColor : undefined,
-                                    color: isSelected ? '#fff' : undefined
+                                    width: totalColumns > 1 ? '20px' : '24px',
+                                    height: totalColumns > 1 ? '20px' : '24px',
+                                    fontSize: totalColumns > 1 ? '0.6rem' : '0.675rem',
+                                    borderColor: isSelected ? cg.avatarColor : 'var(--border)',
+                                    background: isSelected ? cg.avatarColor : '#FFFFFF',
+                                    color: isSelected ? '#fff' : 'var(--text-muted)'
                                   }}
                                 >
                                   {cg.avatarInitials}
@@ -302,8 +398,11 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
                               }}
                               title="Mark No Pickup Needed"
                               style={{
-                                borderColor: isNoPickupNeeded ? '#8B5CF6' : undefined,
-                                background: isNoPickupNeeded ? '#8B5CF6' : undefined,
+                                width: totalColumns > 1 ? '20px' : '24px',
+                                height: totalColumns > 1 ? '20px' : '24px',
+                                fontSize: totalColumns > 1 ? '0.6rem' : '0.675rem',
+                                borderColor: isNoPickupNeeded ? '#8B5CF6' : 'var(--border)',
+                                background: isNoPickupNeeded ? '#8B5CF6' : '#FFFFFF',
                                 color: isNoPickupNeeded ? '#fff' : '#7C3AED'
                               }}
                             >
