@@ -12,7 +12,8 @@ import {
   Clock, 
   Palmtree, 
   AlertTriangle,
-  AlertCircle
+  AlertCircle,
+  Plus
 } from 'lucide-react';
 
 interface PositionedEvent {
@@ -36,7 +37,9 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
     restoreEventInstance,
     applyWeeklyBlueprint,
     setSelectedDate,
-    setViewMode
+    setViewMode,
+    openAddEventModal,
+    setReassignModalEvent
   } = useSchedule();
 
   const [selectedChildFilter, setSelectedChildFilter] = useState<string>('all');
@@ -240,15 +243,27 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
                   )}
                 </div>
 
-                <button
-                  type="button"
-                  className="nav-btn"
-                  style={{ padding: '2px 4px', color: dayHoliday ? '#059669' : knownHoliday ? '#7C3AED' : 'var(--text-muted)' }}
-                  onClick={() => setHolidayModalTargetDate(d.dateStr)}
-                  title={dayHoliday ? `Holiday: ${dayHoliday.name}` : knownHoliday ? `Suggested: ${knownHoliday.name}` : 'Mark as holiday / day off'}
-                >
-                  <Palmtree size={14} />
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                  <button
+                    type="button"
+                    className="nav-btn"
+                    style={{ padding: '2px 4px', color: 'var(--primary)' }}
+                    onClick={() => openAddEventModal(d.dateStr)}
+                    title={`Add new event for ${d.dayName} (${d.dateStr})`}
+                  >
+                    <Plus size={14} />
+                  </button>
+
+                  <button
+                    type="button"
+                    className="nav-btn"
+                    style={{ padding: '2px 4px', color: dayHoliday ? '#059669' : knownHoliday ? '#7C3AED' : 'var(--text-muted)' }}
+                    onClick={() => setHolidayModalTargetDate(d.dateStr)}
+                    title={dayHoliday ? `Holiday: ${dayHoliday.name}` : knownHoliday ? `Suggested: ${knownHoliday.name}` : 'Mark as holiday / day off'}
+                  >
+                    <Palmtree size={14} />
+                  </button>
+                </div>
               </div>
             );
           })}
@@ -325,7 +340,12 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
                         }}
                       >
                         {/* Event Header */}
-                        <div className="cal-block-header">
+                        <div 
+                          className="cal-block-header"
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => setReassignModalEvent(evt)}
+                          title="Click to view details, reassign, or permanently delete"
+                        >
                           <span className="cal-block-time">
                             {evt.startTime}
                           </span>
@@ -349,7 +369,9 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
                         {/* Title - Cleanly truncated and styled */}
                         <div 
                           className={`cal-block-title ${isCancelled ? 'strikethrough' : ''}`}
-                          title={evt.title}
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => setReassignModalEvent(evt)}
+                          title={`${evt.title} — Click to reassign or permanently delete`}
                         >
                           {evt.title}
                         </div>

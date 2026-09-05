@@ -12,7 +12,8 @@ import {
   RotateCcw,
   Ban,
   UserX,
-  Smile
+  Smile,
+  Trash2
 } from 'lucide-react';
 
 interface EventCardProps {
@@ -26,7 +27,8 @@ export const EventCard: React.FC<EventCardProps> = ({ event }) => {
     reassignEvent, 
     cancelEventInstance, 
     markNoPickupNeeded,
-    restoreEventInstance 
+    restoreEventInstance,
+    setReassignModalEvent
   } = useSchedule();
   
   const [showCancelPrompt, setShowCancelPrompt] = useState(false);
@@ -264,6 +266,17 @@ export const EventCard: React.FC<EventCardProps> = ({ event }) => {
             title="Mark as No Class / Holiday"
           >
             <Palmtree size={13} />
+          </button>
+
+          {/* Edit / Remove Action */}
+          <button
+            type="button"
+            className="nav-btn"
+            style={{ padding: '2px 6px', fontSize: '0.75rem', color: 'var(--text-muted)' }}
+            onClick={() => setReassignModalEvent(event)}
+            title="Reassign or permanently delete this event"
+          >
+            <Trash2 size={13} />
           </button>
         </div>
       </div>

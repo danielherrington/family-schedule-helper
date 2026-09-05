@@ -201,6 +201,71 @@ export class RecurrenceEngine {
   }
 
   /**
+   * Permanently removes an event template and all its recurring instances from the schedule
+   */
+  public static deletePermanently(
+    eventsList: any[],
+    templatesList: any[],
+    eventId: string
+  ): { updatedEvents: any[]; updatedTemplates: any[]; result: ReassignResult } {
+    const targetEvent = eventsList.find((e) => e.id === eventId);
+    const seriesId = targetEvent?.masterSeriesId || targetEvent?.id || eventId;
+    const title = targetEvent?.title || 'Event';
+    const childId = targetEvent?.childId;
+
+    // Filter out matching templates
+    const updatedTemplates = templatesList.filter(
+      (t) => t.id !== seriesId && t.id !== eventId && !(t.title === title && (!childId || t.childId === childId))
+    );
+
+    // Filter out all matching events across the entire schedule
+    const updatedEvents = eventsList.filter(
+      (e) => e.id !== eventId && e.masterSeriesId !== seriesId && !(e.title === title && (!childId || e.childId === childId))
+    );
+
+    const removedCount = eventsList.length - updatedEvents.length;
+
+    const result: ReassignResult = {
+      success: true,
+      eventId,
+      previousAssignee: targetEvent?.assignedTo || 'system',
+      newAssignee: 'deleted_permanently',
+      date: targetEvent?.date || new Date().toISOString().split('T')[0],
+      isException: false,
+      actionTaken: 'atomic_split',
+      message: `Permanently deleted "${title}" from weekly blueprint and removed ${removedCount} scheduled instances.`,
+      timestamp: new Date().toISOString()
+    };
+
+    return { updatedEvents, updatedTemplates, result };
+  }
+
+  /**
+   * Deletes a single event instance from the schedule
+   */
+  public static deleteSingleEvent(
+    eventsList: any[],
+    eventId: string
+  ): { updatedEvents: any[]; result: ReassignResult } {
+    const targetEvent = eventsList.find((e) => e.id === eventId);
+    const updatedEvents = eventsList.filter((e) => e.id !== eventId);
+
+    const result: ReassignResult = {
+      success: true,
+      eventId,
+      previousAssignee: targetEvent?.assignedTo || 'system',
+      newAssignee: 'deleted',
+      date: targetEvent?.date || new Date().toISOString().split('T')[0],
+      isException: true,
+      actionTaken: 'atomic_split',
+      message: `Removed single instance of "${targetEvent?.title || 'Event'}" on ${targetEvent?.date}.`,
+      timestamp: new Date().toISOString()
+    };
+
+    return { updatedEvents, result };
+  }
+
+  /**
    * Scans a schedule for unassigned or missing pickups and drop-offs (ignoring cancelled & no-pickup-needed)
    */
   public static detectGaps(eventsList: any[], targetDate?: string) {

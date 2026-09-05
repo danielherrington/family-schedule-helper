@@ -12,7 +12,8 @@ import {
   Grid,
   ListTodo,
   CalendarDays,
-  Bell
+  Bell,
+  Plus
 } from 'lucide-react';
 
 export const Header: React.FC = () => {
@@ -26,6 +27,7 @@ export const Header: React.FC = () => {
     setIsAuditLogOpen,
     setIsSetupOpen,
     setIsSundayAlertOpen,
+    openAddEventModal,
     resetToDemoSchedule 
   } = useSchedule();
 
@@ -107,17 +109,33 @@ export const Header: React.FC = () => {
           )}
         </div>
 
-        {/* Right Controls: Setup Hub, Gaps, Settings */}
+        {/* Right Controls: Add Event, Setup Hub, Gaps, Settings */}
         <div className="header-controls">
+          {/* Add Event Button */}
+          <button
+            className="btn btn-primary"
+            onClick={() => openAddEventModal(selectedDate)}
+            title="Schedule a new pickup, drop-off, or activity event"
+            style={{ 
+              fontWeight: 800, 
+              background: 'linear-gradient(135deg, var(--primary) 0%, #0096c7 100%)',
+              color: '#ffffff',
+              boxShadow: '0 2px 8px rgba(0, 180, 216, 0.3)'
+            }}
+          >
+            <Plus size={16} />
+            <span>+ Add Event</span>
+          </button>
+
           {/* Family Setup Hub Button */}
           <button 
-            className="btn btn-primary"
+            className="btn"
             onClick={() => setIsSetupOpen(true)}
             title="Manage Potential Caregivers, Potential Kids, and Weekly Blueprint"
             style={{ fontWeight: 700 }}
           >
             <Users size={16} />
-            <span>Family Setup</span>
+            <span className="hide-mobile">Family Setup</span>
           </button>
 
           {gaps.length > 0 && (

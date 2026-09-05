@@ -1,15 +1,24 @@
 import React, { useState } from 'react';
 import { useSchedule } from '../context/ScheduleContext';
 import { CaregiverId } from '../types/schedule';
-import { X, Check, ShieldAlert, Sparkles } from 'lucide-react';
+import { X, Check, ShieldAlert, Sparkles, Trash2, AlertTriangle, RotateCcw } from 'lucide-react';
 
 export const QuickAssignModal: React.FC = () => {
-  const { reassignModalEvent, setReassignModalEvent, caregivers, reassignEvent } = useSchedule();
+  const { 
+    reassignModalEvent, 
+    setReassignModalEvent, 
+    caregivers, 
+    reassignEvent, 
+    deletePermanently, 
+    deleteSingleEvent 
+  } = useSchedule();
+  
   const [selectedCaregiverId, setSelectedCaregiverId] = useState<CaregiverId>(
     reassignModalEvent?.assignedTo || 'daniel'
   );
   const [reason, setReason] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<'single' | 'permanent' | null>(null);
 
   if (!reassignModalEvent) return null;
 
@@ -17,6 +26,26 @@ export const QuickAssignModal: React.FC = () => {
     try {
       setIsSubmitting(true);
       await reassignEvent(reassignModalEvent.id, selectedCaregiverId, reason.trim() || undefined);
+      setReassignModalEvent(null);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleExecuteDeleteSingle = async () => {
+    try {
+      setIsSubmitting(true);
+      await deleteSingleEvent(reassignModalEvent.id);
+      setReassignModalEvent(null);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleExecuteDeletePermanent = async () => {
+    try {
+      setIsSubmitting(true);
+      await deletePermanently(reassignModalEvent.id);
       setReassignModalEvent(null);
     } finally {
       setIsSubmitting(false);
@@ -41,7 +70,7 @@ export const QuickAssignModal: React.FC = () => {
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div>
-            <div className="modal-title">Reassign Caregiver</div>
+            <div className="modal-title">Event Logistics & Assignment</div>
             <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
               {reassignModalEvent.title} • {reassignModalEvent.date} ({reassignModalEvent.startTime} - {reassignModalEvent.endTime})
             </div>
@@ -58,19 +87,19 @@ export const QuickAssignModal: React.FC = () => {
           {/* Recurrence Safety Notice */}
           <div 
             style={{
-              background: 'rgba(59, 130, 246, 0.1)',
-              border: '1px solid rgba(59, 130, 246, 0.3)',
+              background: 'rgba(0, 180, 216, 0.1)',
+              border: '1px solid rgba(0, 180, 216, 0.3)',
               borderRadius: '10px',
               padding: '12px 14px',
               fontSize: '0.825rem',
-              color: '#93c5fd',
+              color: 'var(--primary)',
               display: 'flex',
               gap: '10px'
             }}
           >
             <Sparkles size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
             <div>
-              <strong>Atomic Recurrence Exception:</strong> This will reassign only the <strong>{reassignModalEvent.date}</strong> occurrence. The master repeating series will remain completely intact without creating phantom duplicates.
+              <strong>Atomic Exception:</strong> Selecting a new driver updates only the <strong>{reassignModalEvent.date}</strong> occurrence without affecting future recurring dates.
             </div>
           </div>
 
@@ -128,6 +157,86 @@ export const QuickAssignModal: React.FC = () => {
               }}
             />
           </div>
+
+          {/* Delete / Remove Permanently Section */}
+          <div 
+            style={{ 
+              marginTop: '10px', 
+              paddingTop: '14px', 
+              borderTop: '1px solid var(--border)' 
+            }}
+          >
+            {showDeleteConfirm === null ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Need to cancel or permanently remove this duty?
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    type="button"
+                    className="btn"
+                    style={{ fontSize: '0.75rem', padding: '5px 10px', color: 'var(--text-muted)' }}
+                    onClick={() => setShowDeleteConfirm('single')}
+                  >
+                    Remove This Day
+                  </button>
+                  <button
+                    type="button"
+                    className="btn"
+                    style={{ fontSize: '0.75rem', padding: '5px 10px', borderColor: 'rgba(239, 68, 68, 0.4)', color: '#ef4444' }}
+                    onClick={() => setShowDeleteConfirm('permanent')}
+                  >
+                    <Trash2 size={13} style={{ display: 'inline', marginRight: '4px' }} />
+                    Delete Permanently
+                  </button>
+                </div>
+              </div>
+            ) : showDeleteConfirm === 'single' ? (
+              <div style={{ background: 'var(--surface-card)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>
+                  Remove "{reassignModalEvent.title}" for {reassignModalEvent.date} only?
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                  <button type="button" className="btn" onClick={() => setShowDeleteConfirm(null)}>
+                    Cancel
+                  </button>
+                  <button 
+                    type="button" 
+                    className="btn" 
+                    style={{ background: '#ef4444', color: '#fff', fontWeight: 700 }}
+                    onClick={handleExecuteDeleteSingle}
+                    disabled={isSubmitting}
+                  >
+                    Confirm Remove Today
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ background: 'rgba(239, 68, 68, 0.08)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#ef4444', fontWeight: 800, fontSize: '0.85rem', marginBottom: '4px' }}>
+                  <AlertTriangle size={16} />
+                  <span>Permanently Delete From All Weeks?</span>
+                </div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '10px' }}>
+                  This will remove the event template from your Weekly Blueprint and permanently delete all repeating instances of "{reassignModalEvent.title}" across every week.
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                  <button type="button" className="btn" onClick={() => setShowDeleteConfirm(null)}>
+                    Cancel
+                  </button>
+                  <button 
+                    type="button" 
+                    className="btn" 
+                    style={{ background: '#ef4444', color: '#fff', fontWeight: 800 }}
+                    onClick={handleExecuteDeletePermanent}
+                    disabled={isSubmitting}
+                  >
+                    Yes, Delete Permanently
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="modal-footer">
@@ -149,3 +258,4 @@ export const QuickAssignModal: React.FC = () => {
     </div>
   );
 };
+

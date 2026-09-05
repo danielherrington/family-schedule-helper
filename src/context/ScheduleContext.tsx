@@ -32,6 +32,8 @@ interface ScheduleContextType {
   isAuditLogOpen: boolean;
   isSetupOpen: boolean;
   isSundayAlertOpen: boolean;
+  isAddEventOpen: boolean;
+  addEventInitialDate: string;
   activeSetupTab: 'caregivers' | 'kids' | 'blueprint';
   
   // Actions
@@ -47,11 +49,30 @@ interface ScheduleContextType {
   setIsAuditLogOpen: (open: boolean) => void;
   setIsSetupOpen: (open: boolean) => void;
   setIsSundayAlertOpen: (open: boolean) => void;
+  setIsAddEventOpen: (open: boolean) => void;
+  openAddEventModal: (dateStr?: string) => void;
   setActiveSetupTab: (tab: 'caregivers' | 'kids' | 'blueprint') => void;
   resetToDemoSchedule: () => Promise<void>;
   addToast: (message: string, type?: 'success' | 'info' | 'warning' | 'error') => void;
   removeToast: (id: string) => void;
   changeDateByDays: (days: number) => void;
+
+  // Event & Blueprint Management
+  addNewEvent: (data: {
+    title: string;
+    childId: string;
+    category?: 'dropoff' | 'pickup' | 'activity' | 'routine';
+    date: string;
+    startTime: string;
+    endTime: string;
+    location?: string;
+    assignedTo?: string;
+    isRecurring?: boolean;
+    recurringDays?: number[];
+    notes?: string;
+  }) => Promise<void>;
+  deletePermanently: (eventId: string) => Promise<void>;
+  deleteSingleEvent: (eventId: string) => Promise<void>;
 
   // Setup CRUD
   addCaregiver: (data: Partial<Caregiver>) => Promise<void>;
@@ -95,7 +116,14 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [isAuditLogOpen, setIsAuditLogOpen] = useState<boolean>(false);
   const [isSetupOpen, setIsSetupOpen] = useState<boolean>(false);
   const [isSundayAlertOpen, setIsSundayAlertOpen] = useState<boolean>(false);
+  const [isAddEventOpen, setIsAddEventOpen] = useState<boolean>(false);
+  const [addEventInitialDate, setAddEventInitialDate] = useState<string>('2026-09-01');
   const [activeSetupTab, setActiveSetupTab] = useState<'caregivers' | 'kids' | 'blueprint'>('caregivers');
+
+  const openAddEventModal = (dateStr?: string) => {
+    setAddEventInitialDate(dateStr || selectedDate);
+    setIsAddEventOpen(true);
+  };
 
   const currentWeekDays = useMemo(() => {
     try {
@@ -464,6 +492,148 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } catch (err) {}
   };
 
+  // Add New Event (Single or Recurring)
+  const addNewEvent = async (data: {
+    title: string;
+    childId: string;
+    category?: 'dropoff' | 'pickup' | 'activity' | 'routine';
+    date: string;
+    startTime: string;
+    endTime: string;
+    location?: string;
+    assignedTo?: string;
+    isRecurring?: boolean;
+    recurringDays?: number[];
+    notes?: string;
+  }) => {
+    const isRec = !!data.isRecurring && Array.isArray(data.recurringDays) && data.recurringDays.length > 0;
+    const newEventsToAdd: DispatchEvent[] = [];
+
+    if (isRec) {
+      const templateId = `tpl-${Date.now()}`;
+      const newTemplate: EventTemplate = {
+        id: templateId,
+        title: data.title,
+        childId: data.childId,
+        category: data.category || 'pickup',
+        daysOfWeek: data.recurringDays!,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        location: data.location || 'School',
+        defaultCaregiverId: data.assignedTo || 'daniel',
+        notes: data.notes
+      };
+
+      setTemplates((prev) => [...prev, newTemplate]);
+
+      // Generate for the current week of the given date
+      const baseDate = new Date(data.date + 'T12:00:00');
+      const dayOfWeek = baseDate.getDay();
+      const diff = baseDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+      const monday = new Date(baseDate.setDate(diff));
+
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+        const dNum = d.getDay() === 0 ? 7 : d.getDay();
+        if (data.recurringDays!.includes(dNum)) {
+          const dStr = d.toISOString().split('T')[0];
+          newEventsToAdd.push({
+            id: `evt-${dStr}-${templateId}`,
+            title: data.title,
+            childId: data.childId,
+            assignedTo: data.assignedTo || 'daniel',
+            date: dStr,
+            startTime: data.startTime,
+            endTime: data.endTime,
+            location: data.location || 'School',
+            category: data.category || 'pickup',
+            isRecurringMaster: true,
+            masterSeriesId: templateId,
+            notes: data.notes,
+            status: data.assignedTo === 'unassigned' ? 'unassigned' : 'confirmed'
+          });
+        }
+      }
+      addToast(`Added recurring event "${data.title}" to weekly blueprint (${newEventsToAdd.length} days)`, 'success');
+    } else {
+      const newId = `evt-${Date.now()}`;
+      newEventsToAdd.push({
+        id: newId,
+        title: data.title,
+        childId: data.childId,
+        assignedTo: data.assignedTo || 'daniel',
+        date: data.date,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        location: data.location || 'School',
+        category: data.category || 'pickup',
+        isRecurringMaster: false,
+        notes: data.notes,
+        status: data.assignedTo === 'unassigned' ? 'unassigned' : 'confirmed'
+      });
+      addToast(`Added event "${data.title}" for ${data.date}`, 'success');
+    }
+
+    setEvents((prev) => [...prev, ...newEventsToAdd]);
+
+    try {
+      await fetch('/api/schedule/add-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+    } catch (err) {}
+  };
+
+  // Permanently Delete Event from all weeks and blueprint
+  const deletePermanently = async (eventId: string) => {
+    const targetEvent = events.find((e) => e.id === eventId);
+    const seriesId = targetEvent?.masterSeriesId || targetEvent?.id || eventId;
+    const title = targetEvent?.title || 'Event';
+    const childId = targetEvent?.childId;
+
+    // Filter out templates
+    setTemplates((prev) =>
+      prev.filter(
+        (t) => t.id !== seriesId && t.id !== eventId && !(t.title === title && (!childId || t.childId === childId))
+      )
+    );
+
+    // Filter out all matching events across all dates
+    setEvents((prev) =>
+      prev.filter(
+        (e) => e.id !== eventId && e.masterSeriesId !== seriesId && !(e.title === title && (!childId || e.childId === childId))
+      )
+    );
+
+    // Clear from gaps
+    setGaps((prev) => prev.filter((g) => g.eventId !== eventId));
+
+    addToast(`🗑️ Permanently removed "${title}" from weekly schedule & blueprint`, 'info');
+
+    try {
+      await fetch('/api/schedule/delete-permanent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventId })
+      });
+    } catch (err) {}
+  };
+
+  // Delete Single Event Instance
+  const deleteSingleEvent = async (eventId: string) => {
+    const targetEvent = events.find((e) => e.id === eventId);
+    setEvents((prev) => prev.filter((e) => e.id !== eventId));
+    setGaps((prev) => prev.filter((g) => g.eventId !== eventId));
+
+    addToast(`Removed "${targetEvent?.title || 'Event'}" from ${targetEvent?.date || 'schedule'}`, 'info');
+
+    try {
+      await fetch(`/api/schedule/events/${eventId}`, { method: 'DELETE' });
+    } catch (err) {}
+  };
+
   const applyWeeklyBlueprint = async (mondayDateStr: string = '2026-08-31') => {
     const monday = new Date(mondayDateStr + 'T12:00:00');
     const generatedEvents: DispatchEvent[] = [];
@@ -546,11 +716,18 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setIsSetupOpen,
         isSundayAlertOpen,
         setIsSundayAlertOpen,
+        isAddEventOpen,
+        setIsAddEventOpen,
+        addEventInitialDate,
+        openAddEventModal,
         setActiveSetupTab,
         resetToDemoSchedule,
         addToast,
         removeToast,
         changeDateByDays,
+        addNewEvent,
+        deletePermanently,
+        deleteSingleEvent,
         addCaregiver,
         deleteCaregiver,
         addChild,

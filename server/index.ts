@@ -312,6 +312,152 @@ app.post('/api/schedule/restore-event', (req, res) => {
   }
 });
 
+// Delete Single Event Occurrence
+app.delete('/api/schedule/events/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { updatedEvents, result } = RecurrenceEngine.deleteSingleEvent(eventsState, id);
+    eventsState = updatedEvents;
+    auditLog.unshift(result);
+    res.json({ success: true, result });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to delete event' });
+  }
+});
+
+// Permanently Delete Recurring Series & Blueprint Template
+app.post('/api/schedule/delete-permanent', (req, res) => {
+  try {
+    const { eventId } = req.body;
+    if (!eventId) return res.status(400).json({ error: 'eventId is required' });
+
+    const { updatedEvents, updatedTemplates, result } = RecurrenceEngine.deletePermanently(
+      eventsState,
+      templatesState,
+      eventId
+    );
+    eventsState = updatedEvents;
+    templatesState = updatedTemplates;
+    auditLog.unshift(result);
+
+    res.json({ success: true, result, events: eventsState, templates: templatesState });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to delete permanently' });
+  }
+});
+
+// Add New Event (Single or Recurring)
+app.post('/api/schedule/add-event', (req, res) => {
+  try {
+    const {
+      title,
+      childId,
+      category,
+      date,
+      startTime,
+      endTime,
+      location,
+      assignedTo,
+      isRecurring,
+      recurringDays,
+      notes
+    } = req.body;
+
+    if (!title || !childId || !date || !startTime || !endTime) {
+      return res.status(400).json({ error: 'Missing required event parameters' });
+    }
+
+    const newEventId = `evt-${Date.now()}`;
+    const newEventsToAdd: any[] = [];
+
+    if (isRecurring && Array.isArray(recurringDays) && recurringDays.length > 0) {
+      const templateId = `tpl-${Date.now()}`;
+      const newTemplate: EventTemplate = {
+        id: templateId,
+        title,
+        childId,
+        category: category || 'pickup',
+        daysOfWeek: recurringDays,
+        startTime,
+        endTime,
+        location: location || 'School',
+        defaultCaregiverId: assignedTo || 'daniel',
+        notes
+      };
+      templatesState.push(newTemplate);
+
+      // Generate for the current week of the given date
+      const baseDate = new Date(date + 'T12:00:00');
+      const dayOfWeek = baseDate.getDay();
+      const diff = baseDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+      const monday = new Date(baseDate.setDate(diff));
+
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+        const dNum = d.getDay() === 0 ? 7 : d.getDay();
+        if (recurringDays.includes(dNum)) {
+          const dStr = d.toISOString().split('T')[0];
+          newEventsToAdd.push({
+            id: `evt-${dStr}-${templateId}`,
+            title,
+            childId,
+            assignedTo: assignedTo || 'daniel',
+            date: dStr,
+            startTime,
+            endTime,
+            location: location || 'School',
+            category: category || 'pickup',
+            isRecurringMaster: true,
+            masterSeriesId: templateId,
+            notes,
+            status: assignedTo === 'unassigned' ? 'unassigned' : 'confirmed'
+          });
+        }
+      }
+    } else {
+      // One-off single event
+      newEventsToAdd.push({
+        id: newEventId,
+        title,
+        childId,
+        assignedTo: assignedTo || 'daniel',
+        date,
+        startTime,
+        endTime,
+        location: location || 'School',
+        category: category || 'pickup',
+        isRecurringMaster: false,
+        notes,
+        status: assignedTo === 'unassigned' ? 'unassigned' : 'confirmed'
+      });
+    }
+
+    eventsState = [...eventsState, ...newEventsToAdd];
+
+    auditLog.unshift({
+      success: true,
+      eventId: newEventId,
+      previousAssignee: 'none',
+      newAssignee: assignedTo || 'daniel',
+      date,
+      isException: false,
+      actionTaken: 'reassigned_in_memory',
+      message: `Added ${isRecurring ? 'recurring' : 'one-off'} event "${title}" for ${childId.toUpperCase()} (${startTime} - ${endTime}).`,
+      timestamp: new Date().toISOString()
+    });
+
+    res.json({
+      success: true,
+      addedCount: newEventsToAdd.length,
+      events: newEventsToAdd,
+      allEvents: eventsState
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to add event' });
+  }
+});
+
 // Mark Whole Day as Holiday
 app.post('/api/schedule/mark-day-holiday', (req, res) => {
   try {

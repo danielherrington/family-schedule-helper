@@ -17,7 +17,16 @@ import {
 import { getHolidayForDate } from '../utils/holidayEngine';
 
 export const DailyDispatchBoard: React.FC = () => {
-  const { events, selectedDate, children: childrenList, holidays, caregivers, setIsSetupOpen, setActiveSetupTab } = useSchedule();
+  const { 
+    events, 
+    selectedDate, 
+    children: childrenList, 
+    holidays, 
+    caregivers, 
+    setIsSetupOpen, 
+    setActiveSetupTab,
+    openAddEventModal
+  } = useSchedule();
   const [selectedChildFilter, setSelectedChildFilter] = useState<string>('all');
   const [isHolidayModalOpen, setIsHolidayModalOpen] = useState<boolean>(false);
 
@@ -153,6 +162,16 @@ export const DailyDispatchBoard: React.FC = () => {
 
         {/* Action Controls & Stats */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <button
+            className="btn btn-primary"
+            style={{ padding: '6px 14px', fontSize: '0.85rem', fontWeight: 700 }}
+            onClick={() => openAddEventModal(selectedDate)}
+            title="Add pickup, drop-off, or activity for this day"
+          >
+            <Plus size={15} />
+            <span>+ Add Event</span>
+          </button>
+
           <button
             className="btn"
             style={{
