@@ -5,37 +5,37 @@ export const DEFAULT_CAREGIVERS: Caregiver[] = [
     id: 'daniel',
     name: 'Daniel',
     role: 'Parent / Manager',
-    avatarColor: '#2563eb',
+    avatarColor: '#008B8B', // Ocean Teal
     calendarId: 'family_daniel@herrington.ai',
     isManager: true,
     avatarInitials: 'DH'
   },
   {
-    id: 'elizabeth',
-    name: 'Elizabeth',
-    role: 'Parent / Manager',
-    avatarColor: '#059669',
-    calendarId: 'family_elizabeth@herrington.ai',
-    isManager: true,
-    avatarInitials: 'EH'
-  },
-  {
     id: 'lucila',
-    name: 'Lucila (Lu)',
-    role: 'Nanny',
-    avatarColor: '#9333ea',
+    name: 'Lucila',
+    role: 'Parent / Manager',
+    avatarColor: '#FF5E7E', // Miami Flamingo Coral
     calendarId: 'family_lucila@herrington.ai',
-    isManager: false,
+    isManager: true,
     avatarInitials: 'LU'
   },
   {
-    id: 'matilde',
-    name: 'Matilde (Abu / Eli)',
-    role: 'Grandmother',
-    avatarColor: '#d97706',
-    calendarId: 'family_matilde@herrington.ai',
+    id: 'elizabeth',
+    name: 'Elizabeth',
+    role: 'Caregiver',
+    avatarColor: '#00B4D8', // Biscayne Cyan
+    calendarId: 'family_elizabeth@herrington.ai',
     isManager: false,
-    avatarInitials: 'AB'
+    avatarInitials: 'EH'
+  },
+  {
+    id: 'matilda',
+    name: 'Matilda (Abu)',
+    role: 'Caregiver / Grandmother',
+    avatarColor: '#FF9F1C', // Sunset Gold
+    calendarId: 'family_matilda@herrington.ai',
+    isManager: false,
+    avatarInitials: 'MA'
   }
 ];
 
@@ -43,17 +43,17 @@ export const DEFAULT_CHILDREN: Child[] = [
   {
     id: 'izzy',
     name: 'Izzy',
-    color: '#a855f7',
-    badgeBg: 'rgba(168, 85, 247, 0.15)',
-    badgeBorder: 'rgba(168, 85, 247, 0.4)',
+    color: '#7928CA', // Art Deco Violet
+    badgeBg: 'rgba(121, 40, 202, 0.12)',
+    badgeBorder: 'rgba(121, 40, 202, 0.35)',
     school: 'Lehrman Community Day School'
   },
   {
     id: 'vale',
     name: 'Vale',
-    color: '#22c55e',
-    badgeBg: 'rgba(34, 197, 94, 0.15)',
-    badgeBorder: 'rgba(34, 197, 94, 0.4)',
+    color: '#059669', // South Beach Emerald
+    badgeBg: 'rgba(5, 150, 105, 0.12)',
+    badgeBorder: 'rgba(5, 150, 105, 0.35)',
     school: 'Lehrman / North Beach Elementary'
   }
 ];
@@ -94,14 +94,14 @@ export const DEFAULT_TEMPLATES: EventTemplate[] = [
   },
   {
     id: 'tpl-vale-pickup',
-    title: 'Eli Vale Pick Up',
+    title: 'Abu Pick Up Vale',
     childId: 'vale',
     category: 'pickup',
     daysOfWeek: [1, 2, 3, 4, 5],
     startTime: '15:00',
     endTime: '15:30',
     location: 'Lehrman School',
-    defaultCaregiverId: 'matilde'
+    defaultCaregiverId: 'matilda'
   },
   {
     id: 'tpl-izzy-pickup',
@@ -273,9 +273,9 @@ export const DEFAULT_WEEK_EVENTS: DispatchEvent[] = [
   },
   {
     id: 'evt-tue-pick-1',
-    title: 'Eli Vale Pick Up',
+    title: 'Abu Pick Up Vale',
     childId: 'vale',
-    assignedTo: 'matilde',
+    assignedTo: 'matilda',
     date: '2026-09-01',
     startTime: '15:00',
     endTime: '15:30',
@@ -353,9 +353,9 @@ export const DEFAULT_WEEK_EVENTS: DispatchEvent[] = [
   },
   {
     id: 'evt-wed-pick-2',
-    title: 'Eli Vale Pick Up',
+    title: 'Abu Pick Up Vale',
     childId: 'vale',
-    assignedTo: 'matilde',
+    assignedTo: 'matilda',
     date: '2026-09-02',
     startTime: '15:00',
     endTime: '15:30',
@@ -396,7 +396,7 @@ export const DEFAULT_WEEK_EVENTS: DispatchEvent[] = [
     id: 'evt-thu-drop-2',
     title: 'Izzy School Drop Off',
     childId: 'izzy',
-    assignedTo: 'elizabeth',
+    assignedTo: 'daniel',
     date: '2026-09-03',
     startTime: '08:00',
     endTime: '08:30',
@@ -430,7 +430,7 @@ export const DEFAULT_WEEK_EVENTS: DispatchEvent[] = [
     category: 'pickup',
     isRecurringMaster: false,
     status: 'unassigned',
-    notes: 'Matilde has doctor appointment, need someone to cover Vale pickup!'
+    notes: 'Matilda has appointment, need someone to cover Vale pickup!'
   },
   {
     id: 'evt-thu-hiphop',
@@ -464,7 +464,7 @@ export const DEFAULT_WEEK_EVENTS: DispatchEvent[] = [
     id: 'evt-fri-drop-2',
     title: 'Izzy School Drop Off',
     childId: 'izzy',
-    assignedTo: 'elizabeth',
+    assignedTo: 'lucila',
     date: '2026-09-04',
     startTime: '08:00',
     endTime: '08:30',

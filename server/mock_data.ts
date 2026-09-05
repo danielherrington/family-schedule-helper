@@ -35,37 +35,37 @@ export const INITIAL_CAREGIVERS: Caregiver[] = [
     id: 'daniel',
     name: 'Daniel',
     role: 'Parent / Manager',
-    avatarColor: '#2563eb', // Blue
+    avatarColor: '#008B8B', // Ocean Teal
     calendarId: 'family_daniel@herrington.ai',
     isManager: true,
     avatarInitials: 'DH'
   },
   {
-    id: 'elizabeth',
-    name: 'Elizabeth',
-    role: 'Parent / Manager',
-    avatarColor: '#059669', // Green
-    calendarId: 'family_elizabeth@herrington.ai',
-    isManager: true,
-    avatarInitials: 'EH'
-  },
-  {
     id: 'lucila',
-    name: 'Lucila (Lu)',
-    role: 'Nanny',
-    avatarColor: '#9333ea', // Purple
+    name: 'Lucila',
+    role: 'Parent / Manager',
+    avatarColor: '#FF5E7E', // Miami Flamingo Coral
     calendarId: 'family_lucila@herrington.ai',
-    isManager: false,
+    isManager: true,
     avatarInitials: 'LU'
   },
   {
-    id: 'matilde',
-    name: 'Matilde (Abu / Eli)',
-    role: 'Grandmother',
-    avatarColor: '#d97706', // Amber
-    calendarId: 'family_matilde@herrington.ai',
+    id: 'elizabeth',
+    name: 'Elizabeth',
+    role: 'Caregiver',
+    avatarColor: '#00B4D8', // Biscayne Cyan
+    calendarId: 'family_elizabeth@herrington.ai',
     isManager: false,
-    avatarInitials: 'AB'
+    avatarInitials: 'EH'
+  },
+  {
+    id: 'matilda',
+    name: 'Matilda (Abu)',
+    role: 'Caregiver / Grandmother',
+    avatarColor: '#FF9F1C', // Sunset Gold
+    calendarId: 'family_matilda@herrington.ai',
+    isManager: false,
+    avatarInitials: 'MA'
   }
 ];
 

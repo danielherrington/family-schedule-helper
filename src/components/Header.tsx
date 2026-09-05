@@ -42,11 +42,14 @@ export const Header: React.FC = () => {
         {/* Brand */}
         <div className="brand-section">
           <div className="brand-icon">
-            <Calendar size={22} />
+            <Calendar size={20} />
           </div>
           <div>
-            <div className="brand-title">Schedule Helper</div>
-            <div className="brand-subtitle">Caregiver Logistics & Dispatch</div>
+            <div className="brand-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>Los Herringtons</span>
+              <span className="brand-badge">🌴 Miami</span>
+            </div>
+            <div className="brand-subtitle">Family Logistics & Dispatch</div>
           </div>
         </div>
 

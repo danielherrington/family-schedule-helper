@@ -55,7 +55,7 @@ export const CalendarSettingsModal: React.FC = () => {
               </span>
             </div>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
-              Only managers (Daniel & Elizabeth) authenticate. Caregivers (Lucila, Matilde) do not need logins; the helper updates their shared Google calendars via manager authorization.
+              Only managers (Daniel & Lucila) authenticate. Caregivers (Elizabeth, Matilda) do not need logins; the helper updates their shared Google calendars via manager authorization.
             </p>
             <button 
               className="btn btn-primary"
