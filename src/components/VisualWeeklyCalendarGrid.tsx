@@ -24,6 +24,7 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
     currentWeekDays,
     reassignEvent, 
     cancelEventInstance, 
+    markNoPickupNeeded,
     restoreEventInstance,
     applyWeeklyBlueprint,
     setSelectedDate,
@@ -219,6 +220,7 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
                     const assignedCg = caregivers.find((c) => c.id === evt.assignedTo);
                     const { topPercent, heightPercent } = calculatePosition(evt.startTime, evt.endTime);
                     const isCancelled = evt.status === 'cancelled';
+                    const isNoPickupNeeded = evt.status === 'no_pickup_needed';
                     const hasConflict = isEventConflicted(evt);
 
                     return (
@@ -228,8 +230,8 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
                         style={{
                           top: `${topPercent}%`,
                           minHeight: `${Math.max(heightPercent, 5.5)}%`,
-                          borderLeftColor: isCancelled ? '#10b981' : (child?.color || '#3b82f6'),
-                          backgroundColor: isCancelled ? 'rgba(16, 185, 129, 0.1)' : (child?.badgeBg || 'rgba(59, 130, 246, 0.15)')
+                          borderLeftColor: isCancelled ? '#059669' : isNoPickupNeeded ? '#8B5CF6' : (child?.color || '#FF5E7E'),
+                          backgroundColor: isCancelled ? 'rgba(5, 150, 105, 0.08)' : isNoPickupNeeded ? 'rgba(139, 92, 246, 0.08)' : (child?.badgeBg || 'rgba(255, 94, 126, 0.08)')
                         }}
                       >
                         {/* Event Header */}
@@ -243,8 +245,13 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
                             </span>
                           )}
                           {isCancelled && (
-                            <span style={{ fontSize: '0.65rem', color: '#10b981', fontWeight: 800 }}>
+                            <span style={{ fontSize: '0.65rem', color: '#059669', fontWeight: 800 }}>
                               🌴 OFF
+                            </span>
+                          )}
+                          {isNoPickupNeeded && (
+                            <span style={{ fontSize: '0.625rem', color: '#7C3AED', fontWeight: 800 }}>
+                              🚫 No Pickup
                             </span>
                           )}
                         </div>
@@ -265,7 +272,7 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
                         {!isCancelled && (
                           <div className="cal-block-caregivers">
                             {caregivers.map((cg) => {
-                              const isSelected = evt.assignedTo === cg.id;
+                              const isSelected = evt.assignedTo === cg.id && !isNoPickupNeeded;
                               return (
                                 <button
                                   key={cg.id}
@@ -286,6 +293,22 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
                                 </button>
                               );
                             })}
+                            <button
+                              type="button"
+                              className={`cal-cg-pill ${isNoPickupNeeded ? 'selected' : ''}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                markNoPickupNeeded(evt.id, 'No Pickup Needed');
+                              }}
+                              title="Mark No Pickup Needed"
+                              style={{
+                                borderColor: isNoPickupNeeded ? '#8B5CF6' : undefined,
+                                background: isNoPickupNeeded ? '#8B5CF6' : undefined,
+                                color: isNoPickupNeeded ? '#fff' : '#7C3AED'
+                              }}
+                            >
+                              🚫
+                            </button>
                           </div>
                         )}
                       </div>

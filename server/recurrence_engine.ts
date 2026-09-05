@@ -105,6 +105,42 @@ export class RecurrenceEngine {
   }
 
   /**
+   * Marks a single event as No Pickup / Drop-off Needed (playdate, after-school program, etc.)
+   */
+  public static markNoPickupNeeded(
+    eventsList: any[],
+    eventId: string,
+    reason: string = 'No Pickup Needed'
+  ): { updatedEvents: any[]; result: ReassignResult } {
+    const eventIndex = eventsList.findIndex((e) => e.id === eventId);
+    if (eventIndex === -1) throw new Error(`Event ${eventId} not found`);
+
+    const event = { ...eventsList[eventIndex] };
+    const previousAssignee = event.assignedTo;
+
+    event.status = 'no_pickup_needed';
+    event.isException = true;
+    event.cancellationReason = reason;
+
+    const updatedEvents = [...eventsList];
+    updatedEvents[eventIndex] = event;
+
+    const result: ReassignResult = {
+      success: true,
+      eventId: event.id,
+      previousAssignee,
+      newAssignee: 'none',
+      date: event.date,
+      isException: true,
+      actionTaken: 'cancelled_holiday',
+      message: `Marked "${event.title}" as No Pickup Needed (${reason}) for ${event.date}.`,
+      timestamp: new Date().toISOString()
+    };
+
+    return { updatedEvents, result };
+  }
+
+  /**
    * Restores a previously cancelled event
    */
   public static restoreEventInstance(
@@ -165,14 +201,14 @@ export class RecurrenceEngine {
   }
 
   /**
-   * Scans a schedule for unassigned or missing pickups and drop-offs (ignoring cancelled)
+   * Scans a schedule for unassigned or missing pickups and drop-offs (ignoring cancelled & no-pickup-needed)
    */
   public static detectGaps(eventsList: any[], targetDate?: string) {
     return eventsList
       .filter((e) => {
         const matchesDate = !targetDate || e.date === targetDate;
-        // Ignore cancelled events!
-        const isNotCancelled = e.status !== 'cancelled';
+        // Ignore cancelled & no_pickup_needed events!
+        const isNotCancelled = e.status !== 'cancelled' && e.status !== 'no_pickup_needed';
         return matchesDate && isNotCancelled && (e.assignedTo === 'unassigned' || e.status === 'unassigned');
       })
       .map((e) => ({

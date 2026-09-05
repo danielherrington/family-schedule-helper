@@ -32,7 +32,7 @@ export const DailyDispatchBoard: React.FC = () => {
   // Detect Driver Double-Booking Conflicts
   const conflicts: { caregiverName: string; events: string[]; time: string }[] = [];
   caregivers.forEach((cg) => {
-    const cgEvents = dayEvents.filter((e) => e.assignedTo === cg.id && e.status !== 'cancelled');
+    const cgEvents = dayEvents.filter((e) => e.assignedTo === cg.id && e.status !== 'cancelled' && e.status !== 'no_pickup_needed');
     for (let i = 0; i < cgEvents.length; i++) {
       for (let j = i + 1; j < cgEvents.length; j++) {
         const e1 = cgEvents[i];
@@ -53,8 +53,9 @@ export const DailyDispatchBoard: React.FC = () => {
   const middayPickups = dayEvents.filter((e) => e.startTime >= '12:00' && e.startTime <= '15:30');
   const afternoonActivities = dayEvents.filter((e) => e.startTime > '15:30');
 
-  const totalAssigned = dayEvents.filter((e) => e.assignedTo !== 'unassigned' && e.status !== 'cancelled').length;
-  const totalUnassigned = dayEvents.filter((e) => e.assignedTo === 'unassigned' && e.status !== 'cancelled').length;
+  const totalAssigned = dayEvents.filter((e) => e.assignedTo !== 'unassigned' && e.status !== 'cancelled' && e.status !== 'no_pickup_needed').length;
+  const totalUnassigned = dayEvents.filter((e) => e.assignedTo === 'unassigned' && e.status !== 'cancelled' && e.status !== 'no_pickup_needed').length;
+  const totalNoPickup = dayEvents.filter((e) => e.status === 'no_pickup_needed').length;
   const totalCancelled = dayEvents.filter((e) => e.status === 'cancelled').length;
 
   const activeHoliday = holidays.find((h) => h.date === selectedDate);
@@ -174,6 +175,11 @@ export const DailyDispatchBoard: React.FC = () => {
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--danger)', fontWeight: 700, fontSize: '0.85rem' }}>
               <AlertTriangle size={15} />
               <span><strong>{totalUnassigned}</strong> Unassigned</span>
+            </span>
+          )}
+          {totalNoPickup > 0 && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#7C3AED', fontWeight: 700, fontSize: '0.85rem' }}>
+              <span>🚫 <strong>{totalNoPickup}</strong> No Pickup</span>
             </span>
           )}
           {totalCancelled > 0 && (

@@ -38,6 +38,7 @@ interface ScheduleContextType {
   setViewMode: (mode: 'calendar' | 'daily' | 'weekly') => void;
   reassignEvent: (eventId: string, targetCaregiverId: CaregiverId, reason?: string) => Promise<void>;
   cancelEventInstance: (eventId: string, reason?: string) => Promise<void>;
+  markNoPickupNeeded: (eventId: string, reason?: string) => Promise<void>;
   restoreEventInstance: (eventId: string) => Promise<void>;
   markDayAsHoliday: (dateStr: string, holidayName: string, childId?: string) => Promise<void>;
   setReassignModalEvent: (event: DispatchEvent | null) => void;
@@ -240,6 +241,38 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     try {
       await fetch('/api/schedule/cancel-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventId, reason })
+      });
+    } catch (err) {}
+  };
+
+  // Mark Event as No Pickup / Drop-off Needed (e.g. Playdate, After-school care)
+  const markNoPickupNeeded = async (eventId: string, reason: string = 'No Pickup Needed') => {
+    const targetEvent = events.find((e) => e.id === eventId);
+    if (!targetEvent) return;
+
+    const updated = events.map((e) => {
+      if (e.id === eventId) {
+        return {
+          ...e,
+          status: 'no_pickup_needed' as const,
+          isException: true,
+          cancellationReason: reason
+        };
+      }
+      return e;
+    });
+
+    setEvents(updated);
+    addToast(`🚫 Marked "${targetEvent.title}" as No Pickup Needed (${reason})`, 'info');
+
+    // Remove from gaps so no false alarms are triggered
+    setGaps((prev) => prev.filter((g) => g.eventId !== eventId));
+
+    try {
+      await fetch('/api/schedule/no-pickup-needed', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ eventId, reason })
@@ -501,6 +534,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setViewMode,
         reassignEvent,
         cancelEventInstance,
+        markNoPickupNeeded,
         restoreEventInstance,
         markDayAsHoliday,
         setReassignModalEvent,

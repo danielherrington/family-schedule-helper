@@ -38,7 +38,7 @@ export interface DispatchEvent {
   isException?: boolean;
   notes?: string;
   sourceCalendarId?: string;
-  status: 'confirmed' | 'swap_requested' | 'unassigned' | 'cancelled';
+  status: 'confirmed' | 'swap_requested' | 'unassigned' | 'cancelled' | 'no_pickup_needed';
   cancellationReason?: string;
   isHoliday?: boolean;
   hasConflict?: boolean;

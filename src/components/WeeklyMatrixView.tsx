@@ -3,20 +3,18 @@ import { useSchedule } from '../context/ScheduleContext';
 import { EventCard } from './EventCard';
 import { HolidayModal } from './HolidayModal';
 import { Calendar, Filter, Sparkles, CheckCircle2, AlertCircle, Palmtree } from 'lucide-react';
+import { format } from 'date-fns';
 
 export const WeeklyMatrixView: React.FC = () => {
-  const { events, setSelectedDate, setViewMode, applyWeeklyBlueprint, children: childrenList, holidays } = useSchedule();
+  const { events, currentWeekDays, setSelectedDate, setViewMode, applyWeeklyBlueprint, children: childrenList, holidays } = useSchedule();
   const [selectedChildFilter, setSelectedChildFilter] = useState<string>('all');
   const [holidayModalTargetDate, setHolidayModalTargetDate] = useState<string | null>(null);
 
-  const weekDays = [
-    { name: 'Mon', fullName: 'Monday', dateStr: '2026-08-31' },
-    { name: 'Tue', fullName: 'Tuesday', dateStr: '2026-09-01' },
-    { name: 'Wed', fullName: 'Wednesday', dateStr: '2026-09-02' },
-    { name: 'Thu', fullName: 'Thursday', dateStr: '2026-09-03' },
-    { name: 'Fri', fullName: 'Friday', dateStr: '2026-09-04' },
-    { name: 'Sat', fullName: 'Saturday', dateStr: '2026-09-05' }
-  ];
+  const weekDays = currentWeekDays.map((d) => ({
+    name: format(d, 'EEE'),
+    fullName: format(d, 'EEEE'),
+    dateStr: format(d, 'yyyy-MM-dd')
+  }));
 
   return (
     <div>
@@ -75,7 +73,7 @@ export const WeeklyMatrixView: React.FC = () => {
             })
             .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
-          const unassignedCount = dayEvents.filter((e) => e.assignedTo === 'unassigned' && e.status !== 'cancelled').length;
+          const unassignedCount = dayEvents.filter((e) => e.assignedTo === 'unassigned' && e.status !== 'cancelled' && e.status !== 'no_pickup_needed').length;
           const dayHoliday = holidays.find((h) => h.date === d.dateStr);
 
           return (

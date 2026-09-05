@@ -280,6 +280,22 @@ app.post('/api/schedule/cancel-event', (req, res) => {
   }
 });
 
+// Mark Single Event as No Pickup Needed
+app.post('/api/schedule/no-pickup-needed', (req, res) => {
+  try {
+    const { eventId, reason } = req.body;
+    if (!eventId) return res.status(400).json({ error: 'eventId is required' });
+
+    const { updatedEvents, result } = RecurrenceEngine.markNoPickupNeeded(eventsState, eventId, reason || 'No Pickup Needed');
+    eventsState = updatedEvents;
+    auditLog.unshift(result);
+
+    res.json({ success: true, result, event: eventsState.find((e) => e.id === eventId) });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to mark as no pickup needed' });
+  }
+});
+
 // Restore Cancelled Event
 app.post('/api/schedule/restore-event', (req, res) => {
   try {
