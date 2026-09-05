@@ -41,12 +41,13 @@ export interface DispatchEvent {
   status: 'confirmed' | 'swap_requested' | 'unassigned' | 'cancelled';
   cancellationReason?: string;
   isHoliday?: boolean;
+  hasConflict?: boolean;
 }
 
 export interface DayHoliday {
   date: string; // YYYY-MM-DD
-  name: string; // e.g., "Labor Day", "Teacher Planning Day"
-  childId?: ChildId; // "all" or specific child
+  name: string;
+  childId?: ChildId;
 }
 
 export interface EventTemplate {
@@ -70,6 +71,14 @@ export interface ScheduleGap {
   time: string;
   location: string;
   severity: 'high' | 'medium';
+}
+
+export interface DriverConflict {
+  caregiverId: string;
+  caregiverName: string;
+  date: string;
+  eventIds: string[];
+  message: string;
 }
 
 export interface CalendarMapping {

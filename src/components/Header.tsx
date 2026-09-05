@@ -6,12 +6,12 @@ import {
   ChevronRight, 
   Settings, 
   RotateCcw, 
-  ShieldCheck, 
   AlertCircle,
   FileText,
-  Clock,
-  Sliders,
-  Users
+  Users,
+  Grid,
+  ListTodo,
+  CalendarDays
 } from 'lucide-react';
 
 export const Header: React.FC = () => {
@@ -20,7 +20,6 @@ export const Header: React.FC = () => {
     viewMode, 
     setViewMode, 
     changeDateByDays, 
-    authStatus, 
     gaps, 
     setIsSettingsOpen,
     setIsAuditLogOpen,
@@ -51,20 +50,32 @@ export const Header: React.FC = () => {
           </div>
         </div>
 
-        {/* Center Controls: Date Navigation & View Toggle */}
+        {/* Center Controls: 3-Way View Switcher */}
         <div className="header-controls">
           <div className="btn-toggle-group">
             <button
-              className={`toggle-item ${viewMode === 'weekly' ? 'active' : ''}`}
-              onClick={() => setViewMode('weekly')}
+              className={`toggle-item ${viewMode === 'calendar' ? 'active' : ''}`}
+              onClick={() => setViewMode('calendar')}
+              title="Visual Weekly Calendar Grid (Google Calendar style)"
             >
-              Matrix View
+              <CalendarDays size={14} style={{ display: 'inline', marginRight: '4px', verticalAlign: '-2px' }} />
+              <span>Calendar</span>
             </button>
             <button
               className={`toggle-item ${viewMode === 'daily' ? 'active' : ''}`}
               onClick={() => setViewMode('daily')}
+              title="Daily Shift Dispatch (Morning, Pickups, Activities)"
             >
-              Daily View
+              <ListTodo size={14} style={{ display: 'inline', marginRight: '4px', verticalAlign: '-2px' }} />
+              <span>Daily Shifts</span>
+            </button>
+            <button
+              className={`toggle-item ${viewMode === 'weekly' ? 'active' : ''}`}
+              onClick={() => setViewMode('weekly')}
+              title="Caregiver Roster Matrix View"
+            >
+              <Grid size={14} style={{ display: 'inline', marginRight: '4px', verticalAlign: '-2px' }} />
+              <span>Matrix</span>
             </button>
           </div>
 

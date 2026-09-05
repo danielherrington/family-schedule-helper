@@ -20,7 +20,7 @@ interface ScheduleContextType {
   events: DispatchEvent[];
   holidays: DayHoliday[];
   selectedDate: string; // YYYY-MM-DD
-  viewMode: 'daily' | 'weekly';
+  viewMode: 'calendar' | 'daily' | 'weekly';
   gaps: ScheduleGap[];
   isLoading: boolean;
   toasts: Toast[];
@@ -33,7 +33,7 @@ interface ScheduleContextType {
   
   // Actions
   setSelectedDate: (date: string) => void;
-  setViewMode: (mode: 'daily' | 'weekly') => void;
+  setViewMode: (mode: 'calendar' | 'daily' | 'weekly') => void;
   reassignEvent: (eventId: string, targetCaregiverId: CaregiverId, reason?: string) => Promise<void>;
   cancelEventInstance: (eventId: string, reason?: string) => Promise<void>;
   restoreEventInstance: (eventId: string) => Promise<void>;
@@ -62,7 +62,7 @@ const ScheduleContext = createContext<ScheduleContextType | undefined>(undefined
 
 export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [selectedDate, setSelectedDate] = useState<string>('2026-09-01');
-  const [viewMode, setViewMode] = useState<'daily' | 'weekly'>('weekly');
+  const [viewMode, setViewMode] = useState<'calendar' | 'daily' | 'weekly'>('calendar');
   const [caregivers, setCaregivers] = useState<Caregiver[]>(DEFAULT_CAREGIVERS);
   const [childrenList, setChildrenList] = useState<Child[]>(DEFAULT_CHILDREN);
   const [templates, setTemplates] = useState<EventTemplate[]>(DEFAULT_TEMPLATES);

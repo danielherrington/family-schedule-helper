@@ -1,7 +1,9 @@
 import React from 'react';
 import { useSchedule } from './context/ScheduleContext';
 import { Header } from './components/Header';
+import { WeekStripNavigator } from './components/WeekStripNavigator';
 import { GapAlertBanner } from './components/GapAlertBanner';
+import { VisualWeeklyCalendarGrid } from './components/VisualWeeklyCalendarGrid';
 import { DailyDispatchBoard } from './components/DailyDispatchBoard';
 import { WeeklyMatrixView } from './components/WeeklyMatrixView';
 import { QuickAssignModal } from './components/QuickAssignModal';
@@ -19,6 +21,7 @@ export const AppContent: React.FC = () => {
 
       <main className="main-content">
         <GapAlertBanner />
+        <WeekStripNavigator />
 
         {isLoading ? (
           <div style={{ textAlign: 'center', padding: '80px 20px', color: 'var(--text-muted)' }}>
@@ -27,6 +30,8 @@ export const AppContent: React.FC = () => {
             </div>
             <div>Syncing caregiver calendars & recurrence rules...</div>
           </div>
+        ) : viewMode === 'calendar' ? (
+          <VisualWeeklyCalendarGrid />
         ) : viewMode === 'daily' ? (
           <DailyDispatchBoard />
         ) : (

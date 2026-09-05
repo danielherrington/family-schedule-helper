@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Google Calendar Schedule Helper Stylesheet - Mobile-First Checkbox UI
+   Google Calendar Schedule Helper - Seasoned UX Stylesheet
    ========================================================================== */
 
 :root {
@@ -68,7 +68,7 @@ button, input, select {
   font-family: inherit;
 }
 
-/* App Container */
+/* App Layout */
 .app-layout {
   display: flex;
   flex-direction: column;
@@ -80,7 +80,7 @@ button, input, select {
   max-width: 1440px;
   width: 100%;
   margin: 0 auto;
-  padding: 20px 16px 60px 16px;
+  padding: 16px 16px 60px 16px;
 }
 
 /* Header */
@@ -134,47 +134,11 @@ button, input, select {
   color: var(--text-muted);
 }
 
-/* Controls */
 .header-controls {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-}
-
-.date-navigator {
-  display: flex;
-  align-items: center;
-  background: var(--surface-card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 2px;
-}
-
-.nav-btn {
-  background: transparent;
-  border: none;
-  color: var(--text);
-  padding: 6px 8px;
-  border-radius: 6px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.15s ease;
-}
-
-.nav-btn:hover {
-  background: var(--surface-hover);
-}
-
-.current-date-label {
-  font-size: 0.875rem;
-  font-weight: 700;
-  padding: 0 10px;
-  min-width: 140px;
-  text-align: center;
-  color: var(--text);
 }
 
 .btn-toggle-group {
@@ -191,10 +155,12 @@ button, input, select {
   color: var(--text-muted);
   font-size: 0.8rem;
   font-weight: 700;
-  padding: 6px 14px;
+  padding: 6px 12px;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
 }
 
 .toggle-item.active {
@@ -234,41 +200,377 @@ button, input, select {
   background: var(--accent-hover);
 }
 
-.btn-warning {
-  background: var(--warning);
-  color: #000;
-  border-color: var(--warning);
-  font-weight: 700;
-}
-
-/* Banner */
-.gap-banner {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(239, 68, 68, 0.15) 100%);
-  border: 1px solid rgba(245, 158, 11, 0.4);
-  border-radius: 12px;
-  padding: 12px 18px;
-  margin-bottom: 20px;
+.nav-btn {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  flex-wrap: wrap;
+  justify-content: center;
+  transition: background 0.15s ease;
 }
 
-.gap-banner-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.gap-icon {
-  color: var(--warning);
-  display: flex;
-  align-items: center;
+.nav-btn:hover {
+  background: var(--surface-hover);
 }
 
 /* ==========================================================================
-   Mobile-First Event Card & Checkbox UI
+   Week Strip Navigator
+   ========================================================================== */
+
+.week-strip-container {
+  display: flex;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 6px 10px;
+  margin-bottom: 20px;
+  gap: 6px;
+  box-shadow: var(--shadow-sm);
+}
+
+.week-strip-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  flex: 1;
+}
+
+.week-day-pill {
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 4px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  color: var(--text);
+  min-height: 54px;
+}
+
+.week-day-pill:hover {
+  border-color: var(--accent);
+  background: var(--surface-hover);
+}
+
+.week-day-pill.selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.week-day-name {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.85;
+}
+
+.week-day-num {
+  font-size: 1rem;
+  font-weight: 800;
+  margin: 1px 0;
+}
+
+.week-day-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 10px;
+}
+
+.mini-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.mini-status-dot.covered { background: var(--success); }
+.mini-status-dot.gap { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
+.mini-status-dot.empty { background: transparent; }
+.mini-status-icon.holiday { color: #10b981; }
+
+/* ==========================================================================
+   Visual Weekly Calendar Grid
+   ========================================================================== */
+
+.visual-calendar-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.calendar-grid-canvas {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow-x: auto;
+  box-shadow: var(--shadow-md);
+}
+
+.calendar-grid-header {
+  display: grid;
+  grid-template-columns: 60px repeat(7, minmax(130px, 1fr));
+  background: var(--surface-card);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.time-axis-header {
+  padding: 12px 8px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-align: center;
+  border-right: 1px solid var(--border);
+}
+
+.day-column-header {
+  padding: 10px 8px;
+  border-right: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.day-column-header.is-today {
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.day-name-label {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.day-number-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.calendar-grid-body {
+  display: grid;
+  grid-template-columns: 60px 1fr;
+  position: relative;
+  min-height: 720px;
+}
+
+.time-axis-column {
+  border-right: 1px solid var(--border);
+  background: var(--surface-card);
+  display: flex;
+  flex-direction: column;
+}
+
+.time-hour-marker {
+  height: 60px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  padding-right: 6px;
+  text-align: right;
+  box-sizing: border-box;
+}
+
+.calendar-columns-container {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(130px, 1fr));
+  position: relative;
+}
+
+.grid-horizontal-lines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.grid-hour-line {
+  height: 60px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  box-sizing: border-box;
+}
+
+.calendar-day-column {
+  position: relative;
+  border-right: 1px solid var(--border);
+  min-height: 720px;
+}
+
+.column-holiday-banner {
+  position: sticky;
+  top: 4px;
+  z-index: 5;
+  background: rgba(16, 185, 129, 0.9);
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 4px 8px;
+  border-radius: 6px;
+  margin: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Event Block in Calendar */
+.calendar-event-block {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-left-width: 4px;
+  padding: 6px 8px;
+  box-shadow: var(--shadow-sm);
+  z-index: 2;
+  overflow: hidden;
+  transition: transform 0.15s ease, z-index 0.15s ease, box-shadow 0.15s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.calendar-event-block:hover {
+  z-index: 8;
+  transform: scale(1.02);
+  box-shadow: var(--shadow-md);
+}
+
+.calendar-event-block.is-cancelled {
+  opacity: 0.65;
+  border-style: dashed;
+}
+
+.calendar-event-block.has-conflict {
+  border-color: var(--danger) !important;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+}
+
+.cal-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+
+.cal-block-time {
+  font-family: var(--font-mono);
+  font-size: 0.675rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.conflict-badge {
+  background: var(--danger);
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.cal-block-title {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1.2;
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cal-block-title.strikethrough {
+  text-decoration: line-through;
+}
+
+.cal-block-location {
+  font-size: 0.675rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cal-block-caregivers {
+  display: flex;
+  gap: 3px;
+  margin-top: auto;
+}
+
+.cal-cg-pill {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.cal-cg-pill.selected {
+  font-weight: 800;
+}
+
+/* ==========================================================================
+   Shift Dispatch Grouping
+   ========================================================================== */
+
+.shift-group-container {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.shift-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.shift-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.shift-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+}
+
+/* ==========================================================================
+   Mobile Event Card Styles
    ========================================================================== */
 
 .event-card-mobile {
@@ -363,7 +665,7 @@ button, input, select {
 }
 
 .caregiver-checkbox-pill {
-  min-height: 42px; /* Touch friendly >= 42px */
+  min-height: 42px;
   padding: 6px 8px;
   border-radius: 8px;
   border: 1px solid var(--border);
@@ -405,7 +707,7 @@ button, input, select {
 }
 
 /* ==========================================================================
-   Weekly Grid Matrix
+   Weekly Caregiver Matrix Table
    ========================================================================== */
 
 .weekly-grid-layout {
@@ -468,43 +770,6 @@ button, input, select {
 }
 
 /* ==========================================================================
-   Setup Hub Modal & Tabs
-   ========================================================================== */
-
-.setup-tab-btn {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  font-weight: 700;
-  padding: 10px 16px;
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  transition: all 0.15s ease;
-}
-
-.setup-tab-btn:hover {
-  color: var(--text);
-}
-
-.setup-tab-btn.active {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
-}
-
-.avatar {
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-weight: 800;
-}
-
-/* ==========================================================================
    Modals & Toasts
    ========================================================================== */
 
@@ -562,7 +827,6 @@ button, input, select {
   gap: 10px;
 }
 
-/* Toast Notifications */
 .toast-container {
   position: fixed;
   bottom: 20px;

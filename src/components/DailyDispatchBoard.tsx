@@ -2,10 +2,21 @@ import React, { useState } from 'react';
 import { useSchedule } from '../context/ScheduleContext';
 import { EventCard } from './EventCard';
 import { HolidayModal } from './HolidayModal';
-import { Filter, Calendar, CheckCircle2, AlertTriangle, Plus, Palmtree } from 'lucide-react';
+import { 
+  Filter, 
+  Calendar, 
+  CheckCircle2, 
+  AlertTriangle, 
+  Plus, 
+  Palmtree, 
+  Sunrise, 
+  Sun, 
+  Moon,
+  Sparkles
+} from 'lucide-react';
 
 export const DailyDispatchBoard: React.FC = () => {
-  const { events, selectedDate, children: childrenList, holidays, setIsSetupOpen, setActiveSetupTab } = useSchedule();
+  const { events, selectedDate, children: childrenList, holidays, caregivers, setIsSetupOpen, setActiveSetupTab } = useSchedule();
   const [selectedChildFilter, setSelectedChildFilter] = useState<string>('all');
   const [isHolidayModalOpen, setIsHolidayModalOpen] = useState<boolean>(false);
 
@@ -16,6 +27,30 @@ export const DailyDispatchBoard: React.FC = () => {
       return matchesDate && matchesChild;
     })
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+  // Detect Driver Double-Booking Conflicts
+  const conflicts: { caregiverName: string; events: string[]; time: string }[] = [];
+  caregivers.forEach((cg) => {
+    const cgEvents = dayEvents.filter((e) => e.assignedTo === cg.id && e.status !== 'cancelled');
+    for (let i = 0; i < cgEvents.length; i++) {
+      for (let j = i + 1; j < cgEvents.length; j++) {
+        const e1 = cgEvents[i];
+        const e2 = cgEvents[j];
+        if (e1.startTime < e2.endTime && e2.startTime < e1.endTime) {
+          conflicts.push({
+            caregiverName: cg.name,
+            events: [e1.title, e2.title],
+            time: `${e1.startTime} - ${e1.endTime}`
+          });
+        }
+      }
+    }
+  });
+
+  // Group events into 3 Family Shifts
+  const morningRuns = dayEvents.filter((e) => e.startTime < '12:00');
+  const middayPickups = dayEvents.filter((e) => e.startTime >= '12:00' && e.startTime <= '15:30');
+  const afternoonActivities = dayEvents.filter((e) => e.startTime > '15:30');
 
   const totalAssigned = dayEvents.filter((e) => e.assignedTo !== 'unassigned' && e.status !== 'cancelled').length;
   const totalUnassigned = dayEvents.filter((e) => e.assignedTo === 'unassigned' && e.status !== 'cancelled').length;
@@ -49,6 +84,32 @@ export const DailyDispatchBoard: React.FC = () => {
               <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                 School drop-offs & pick-ups cancelled for this day. Recurring schedule remains active for next week.
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Driver Double-Booking Conflict Alert if any */}
+      {conflicts.length > 0 && (
+        <div 
+          style={{
+            background: 'rgba(239, 68, 68, 0.15)',
+            border: '1px solid rgba(239, 68, 68, 0.4)',
+            borderRadius: '12px',
+            padding: '12px 18px',
+            marginBottom: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
+          }}
+        >
+          <AlertTriangle size={22} color="#ef4444" style={{ flexShrink: 0 }} />
+          <div>
+            <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#ef4444' }}>
+              ⚠️ Driver Double-Booking Conflict Detected!
+            </div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text)' }}>
+              <strong>{conflicts[0].caregiverName}</strong> is assigned to conflicting events at {conflicts[0].time}: <em>"{conflicts[0].events.join('" and "')}"</em>. Reassign one driver to resolve.
             </div>
           </div>
         </div>
@@ -96,7 +157,7 @@ export const DailyDispatchBoard: React.FC = () => {
             title="Mark this day as a holiday or no classes"
           >
             <Palmtree size={15} />
-            <span>Mark Holiday / Day Off</span>
+            <span>Mark Holiday</span>
           </button>
 
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--success)', fontSize: '0.85rem' }}>
@@ -118,7 +179,7 @@ export const DailyDispatchBoard: React.FC = () => {
         </div>
       </div>
 
-      {/* Events List */}
+      {/* SHIFT-BASED CHRONOLOGICAL LOGISTICS */}
       {dayEvents.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px 20px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '16px' }}>
           <Calendar size={36} color="var(--text-dim)" style={{ margin: '0 auto 12px auto' }} />
@@ -138,10 +199,62 @@ export const DailyDispatchBoard: React.FC = () => {
           </button>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '16px' }}>
-          {dayEvents.map((evt) => (
-            <EventCard key={evt.id} event={evt} />
-          ))}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          
+          {/* SHIFT 1: MORNING RUNS */}
+          {morningRuns.length > 0 && (
+            <div className="shift-group-container">
+              <div className="shift-group-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Sunrise size={18} color="#f59e0b" />
+                  <span className="shift-title">Morning School Runs (7:30 AM – 9:00 AM)</span>
+                </div>
+                <span className="count-badge">{morningRuns.length} drop-offs</span>
+              </div>
+              <div className="shift-card-grid">
+                {morningRuns.map((evt) => (
+                  <EventCard key={evt.id} event={evt} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* SHIFT 2: MIDDAY PICKUPS */}
+          {middayPickups.length > 0 && (
+            <div className="shift-group-container">
+              <div className="shift-group-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Sun size={18} color="#3b82f6" />
+                  <span className="shift-title">School Dismissals & Pickups (1:00 PM – 3:30 PM)</span>
+                </div>
+                <span className="count-badge">{middayPickups.length} pickups</span>
+              </div>
+              <div className="shift-card-grid">
+                {middayPickups.map((evt) => (
+                  <EventCard key={evt.id} event={evt} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* SHIFT 3: AFTER-SCHOOL ACTIVITIES */}
+          {afternoonActivities.length > 0 && (
+            <div className="shift-group-container">
+              <div className="shift-group-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Moon size={18} color="#a855f7" />
+                  <span className="shift-title">After-School Classes & Activities (4:00 PM – 6:30 PM)</span>
+                </div>
+                <span className="count-badge">{afternoonActivities.length} activities</span>
+              </div>
+              <div className="shift-card-grid">
+                {afternoonActivities.map((evt) => (
+                  <EventCard key={evt.id} event={evt} />
+                ))}
+              </div>
+            </div>
+          )}
+
         </div>
       )}
 
