@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { format, addDays, startOfWeek, parseISO } from 'date-fns';
 import { Caregiver, Child, DispatchEvent, ScheduleGap, CaregiverId, EventTemplate, DayHoliday } from '../types/schedule';
 import { 
   DEFAULT_CAREGIVERS, 
@@ -20,6 +21,7 @@ interface ScheduleContextType {
   events: DispatchEvent[];
   holidays: DayHoliday[];
   selectedDate: string; // YYYY-MM-DD
+  currentWeekDays: Date[];
   viewMode: 'calendar' | 'daily' | 'weekly';
   gaps: ScheduleGap[];
   isLoading: boolean;
@@ -90,6 +92,17 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [isAuditLogOpen, setIsAuditLogOpen] = useState<boolean>(false);
   const [isSetupOpen, setIsSetupOpen] = useState<boolean>(false);
   const [activeSetupTab, setActiveSetupTab] = useState<'caregivers' | 'kids' | 'blueprint'>('caregivers');
+
+  const currentWeekDays = useMemo(() => {
+    try {
+      const baseDate = parseISO(selectedDate);
+      const start = startOfWeek(baseDate, { weekStartsOn: 1 });
+      return Array.from({ length: 7 }).map((_, i) => addDays(start, i));
+    } catch {
+      const start = startOfWeek(new Date(), { weekStartsOn: 1 });
+      return Array.from({ length: 7 }).map((_, i) => addDays(start, i));
+    }
+  }, [selectedDate]);
 
   const addToast = (message: string, type: 'success' | 'info' | 'warning' | 'error' = 'success') => {
     const id = Math.random().toString(36).substring(2, 9);
@@ -473,6 +486,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         events,
         holidays,
         selectedDate,
+        currentWeekDays,
         viewMode,
         gaps,
         isLoading,

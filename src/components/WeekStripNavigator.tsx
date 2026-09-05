@@ -1,19 +1,17 @@
 import React from 'react';
 import { useSchedule } from '../context/ScheduleContext';
+import { format } from 'date-fns';
+import { getHolidayForDate } from '../utils/holidayEngine';
 import { ChevronLeft, ChevronRight, Palmtree, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export const WeekStripNavigator: React.FC = () => {
-  const { selectedDate, setSelectedDate, events, holidays, changeDateByDays } = useSchedule();
+  const { selectedDate, setSelectedDate, currentWeekDays, events, holidays, changeDateByDays } = useSchedule();
 
-  const weekDays = [
-    { dayName: 'Mon', dateNum: '31', fullDate: '2026-08-31' },
-    { dayName: 'Tue', dateNum: '01', fullDate: '2026-09-01' },
-    { dayName: 'Wed', dateNum: '02', fullDate: '2026-09-02' },
-    { dayName: 'Thu', dateNum: '03', fullDate: '2026-09-03' },
-    { dayName: 'Fri', dateNum: '04', fullDate: '2026-09-04' },
-    { dayName: 'Sat', dateNum: '05', fullDate: '2026-09-05' },
-    { dayName: 'Sun', dateNum: '06', fullDate: '2026-09-06' }
-  ];
+  const weekDays = currentWeekDays.map((d) => ({
+    dayName: format(d, 'EEE'),
+    dateNum: format(d, 'd'),
+    fullDate: format(d, 'yyyy-MM-dd')
+  }));
 
   return (
     <div className="week-strip-container">
@@ -31,7 +29,8 @@ export const WeekStripNavigator: React.FC = () => {
           const isSelected = selectedDate === d.fullDate;
           const dayEvents = events.filter((e) => e.date === d.fullDate);
           const hasGap = dayEvents.some((e) => e.assignedTo === 'unassigned' && e.status !== 'cancelled');
-          const isHoliday = holidays.some((h) => h.date === d.fullDate) || (dayEvents.length > 0 && dayEvents.every((e) => e.status === 'cancelled'));
+          const isMarkedHoliday = holidays.some((h) => h.date === d.fullDate) || (dayEvents.length > 0 && dayEvents.every((e) => e.status === 'cancelled'));
+          const knownHoliday = getHolidayForDate(d.fullDate);
           const activeCount = dayEvents.filter((e) => e.status !== 'cancelled').length;
 
           return (
@@ -46,9 +45,13 @@ export const WeekStripNavigator: React.FC = () => {
 
               {/* Status Dot / Badge */}
               <div className="week-day-status">
-                {isHoliday ? (
-                  <span className="mini-status-icon holiday" title="Holiday / Day Off">
-                    <Palmtree size={11} />
+                {isMarkedHoliday ? (
+                  <span className="mini-status-icon holiday" title="Holiday / Day Off Marked">
+                    <Palmtree size={11} color="#10b981" />
+                  </span>
+                ) : knownHoliday ? (
+                  <span className="mini-status-icon" title={`Upcoming Holiday: ${knownHoliday.name}`}>
+                    <Palmtree size={11} color={knownHoliday.category === 'jewish' ? '#c4b5fd' : '#93c5fd'} />
                   </span>
                 ) : hasGap ? (
                   <span className="mini-status-dot gap" title="Unassigned Driver Gap" />

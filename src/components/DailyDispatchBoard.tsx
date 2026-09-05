@@ -14,6 +14,7 @@ import {
   Moon,
   Sparkles
 } from 'lucide-react';
+import { getHolidayForDate } from '../utils/holidayEngine';
 
 export const DailyDispatchBoard: React.FC = () => {
   const { events, selectedDate, children: childrenList, holidays, caregivers, setIsSetupOpen, setActiveSetupTab } = useSchedule();
@@ -57,6 +58,7 @@ export const DailyDispatchBoard: React.FC = () => {
   const totalCancelled = dayEvents.filter((e) => e.status === 'cancelled').length;
 
   const activeHoliday = holidays.find((h) => h.date === selectedDate);
+  const detectedHoliday = getHolidayForDate(selectedDate);
 
   return (
     <div>
@@ -152,12 +154,16 @@ export const DailyDispatchBoard: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <button
             className="btn"
-            style={{ borderColor: 'rgba(16, 185, 129, 0.4)', color: '#10b981' }}
+            style={{
+              borderColor: detectedHoliday ? 'rgba(139, 92, 246, 0.5)' : 'rgba(16, 185, 129, 0.4)',
+              color: detectedHoliday ? '#c4b5fd' : '#10b981',
+              background: detectedHoliday ? 'rgba(139, 92, 246, 0.12)' : undefined
+            }}
             onClick={() => setIsHolidayModalOpen(true)}
-            title="Mark this day as a holiday or no classes"
+            title={detectedHoliday ? `Recognized: ${detectedHoliday.name}` : "Mark this day as a holiday or no classes"}
           >
             <Palmtree size={15} />
-            <span>Mark Holiday</span>
+            <span>{detectedHoliday ? `Mark ${detectedHoliday.name.split('—')[0].trim()}` : 'Mark Holiday'}</span>
           </button>
 
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--success)', fontSize: '0.85rem' }}>

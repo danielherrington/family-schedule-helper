@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useSchedule } from '../context/ScheduleContext';
 import { DispatchEvent } from '../types/schedule';
 import { HolidayModal } from './HolidayModal';
+import { format, parseISO } from 'date-fns';
+import { getHolidayForDate } from '../utils/holidayEngine';
 import { 
   Filter, 
   Sparkles, 
@@ -19,6 +21,7 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
     caregivers, 
     children: childrenList, 
     holidays, 
+    currentWeekDays,
     reassignEvent, 
     cancelEventInstance, 
     restoreEventInstance,
@@ -31,15 +34,12 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
   const [holidayModalTargetDate, setHolidayModalTargetDate] = useState<string | null>(null);
   const [activePopoverEventId, setActivePopoverEventId] = useState<string | null>(null);
 
-  const weekDays = [
-    { dayName: 'Monday', shortName: 'Mon', dateStr: '2026-08-31', dateNum: '31' },
-    { dayName: 'Tuesday', shortName: 'Tue', dateStr: '2026-09-01', dateNum: '01' },
-    { dayName: 'Wednesday', shortName: 'Wed', dateStr: '2026-09-02', dateNum: '02' },
-    { dayName: 'Thursday', shortName: 'Thu', dateStr: '2026-09-03', dateNum: '03' },
-    { dayName: 'Friday', shortName: 'Fri', dateStr: '2026-09-04', dateNum: '04' },
-    { dayName: 'Saturday', shortName: 'Sat', dateStr: '2026-09-05', dateNum: '05' },
-    { dayName: 'Sunday', shortName: 'Sun', dateStr: '2026-09-06', dateNum: '06' }
-  ];
+  const weekDays = currentWeekDays.map((d) => ({
+    dayName: format(d, 'EEEE'),
+    shortName: format(d, 'EEE'),
+    dateStr: format(d, 'yyyy-MM-dd'),
+    dateNum: format(d, 'd')
+  }));
 
   const timeHours = [
     { hour: 7, label: '7 AM' },
@@ -137,26 +137,34 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
           {weekDays.map((d) => {
             const isToday = d.dateStr === '2026-09-01';
             const dayHoliday = holidays.find((h) => h.date === d.dateStr);
+            const knownHoliday = getHolidayForDate(d.dateStr);
 
             return (
               <div key={d.dateStr} className={`day-column-header ${isToday ? 'is-today' : ''}`}>
                 <div 
-                  style={{ display: 'flex', alignItems: 'baseline', gap: '6px', cursor: 'pointer' }}
+                  style={{ display: 'flex', flexDirection: 'column', gap: '2px', cursor: 'pointer' }}
                   onClick={() => {
                     setSelectedDate(d.dateStr);
                     setViewMode('daily');
                   }}
                 >
-                  <span className="day-name-label">{d.shortName}</span>
-                  <span className="day-number-label">{d.dateNum}</span>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                    <span className="day-name-label">{d.shortName}</span>
+                    <span className="day-number-label">{d.dateNum}</span>
+                  </div>
+                  {knownHoliday && !dayHoliday && (
+                    <span style={{ fontSize: '0.625rem', color: knownHoliday.category === 'jewish' ? '#c4b5fd' : '#93c5fd', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '85px' }}>
+                      🌴 {knownHoliday.name.split('—')[0].trim()}
+                    </span>
+                  )}
                 </div>
 
                 <button
                   type="button"
                   className="nav-btn"
-                  style={{ padding: '2px 4px', color: dayHoliday ? '#10b981' : 'var(--text-muted)' }}
+                  style={{ padding: '2px 4px', color: dayHoliday ? '#10b981' : knownHoliday ? '#c4b5fd' : 'var(--text-muted)' }}
                   onClick={() => setHolidayModalTargetDate(d.dateStr)}
-                  title="Mark as holiday / day off"
+                  title={dayHoliday ? `Holiday: ${dayHoliday.name}` : knownHoliday ? `Suggested: ${knownHoliday.name}` : 'Mark as holiday / day off'}
                 >
                   <Palmtree size={14} />
                 </button>

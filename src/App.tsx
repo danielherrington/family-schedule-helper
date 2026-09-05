@@ -3,6 +3,7 @@ import { useSchedule } from './context/ScheduleContext';
 import { Header } from './components/Header';
 import { WeekStripNavigator } from './components/WeekStripNavigator';
 import { GapAlertBanner } from './components/GapAlertBanner';
+import { HolidaySuggestionBanner } from './components/HolidaySuggestionBanner';
 import { VisualWeeklyCalendarGrid } from './components/VisualWeeklyCalendarGrid';
 import { DailyDispatchBoard } from './components/DailyDispatchBoard';
 import { WeeklyMatrixView } from './components/WeeklyMatrixView';
@@ -21,6 +22,7 @@ export const AppContent: React.FC = () => {
 
       <main className="main-content">
         <GapAlertBanner />
+        <HolidaySuggestionBanner />
         <WeekStripNavigator />
 
         {isLoading ? (
