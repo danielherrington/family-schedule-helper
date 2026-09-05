@@ -343,6 +343,32 @@ app.get('/api/schedule/gaps', (req, res) => {
   res.json({ count: gaps.length, gaps });
 });
 
+// Sunday Night Alert Simulation / Trigger
+app.post('/api/alerts/sunday-test', (req, res) => {
+  const { recipients, time, dateRange } = req.body;
+  const gaps = RecurrenceEngine.detectGaps(eventsState);
+  
+  auditLog.unshift({
+    success: true,
+    eventId: 'sunday-alert',
+    previousAssignee: 'system',
+    newAssignee: 'email-dispatch',
+    date: new Date().toISOString().split('T')[0],
+    isException: false,
+    actionTaken: 'reassigned_in_memory',
+    message: `Dispatched Sunday Night Schedule Alert to ${recipients?.join(', ') || 'parents'}. Active gaps: ${gaps.length}.`,
+    timestamp: new Date().toISOString()
+  });
+
+  res.json({
+    success: true,
+    message: `Sunday Night Reminder sent to ${recipients?.length || 2} recipients for week ${dateRange || 'upcoming'}.`,
+    recipients,
+    time: time || '19:00',
+    gapsCount: gaps.length
+  });
+});
+
 app.post('/api/schedule/reset', (req, res) => {
   eventsState = getWeekSchedule();
   caregiversState = [...INITIAL_CAREGIVERS];

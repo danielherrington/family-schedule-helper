@@ -31,6 +31,7 @@ interface ScheduleContextType {
   isSettingsOpen: boolean;
   isAuditLogOpen: boolean;
   isSetupOpen: boolean;
+  isSundayAlertOpen: boolean;
   activeSetupTab: 'caregivers' | 'kids' | 'blueprint';
   
   // Actions
@@ -45,6 +46,7 @@ interface ScheduleContextType {
   setIsSettingsOpen: (open: boolean) => void;
   setIsAuditLogOpen: (open: boolean) => void;
   setIsSetupOpen: (open: boolean) => void;
+  setIsSundayAlertOpen: (open: boolean) => void;
   setActiveSetupTab: (tab: 'caregivers' | 'kids' | 'blueprint') => void;
   resetToDemoSchedule: () => Promise<void>;
   addToast: (message: string, type?: 'success' | 'info' | 'warning' | 'error') => void;
@@ -92,6 +94,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isAuditLogOpen, setIsAuditLogOpen] = useState<boolean>(false);
   const [isSetupOpen, setIsSetupOpen] = useState<boolean>(false);
+  const [isSundayAlertOpen, setIsSundayAlertOpen] = useState<boolean>(false);
   const [activeSetupTab, setActiveSetupTab] = useState<'caregivers' | 'kids' | 'blueprint'>('caregivers');
 
   const currentWeekDays = useMemo(() => {
@@ -541,6 +544,8 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setIsSettingsOpen,
         setIsAuditLogOpen,
         setIsSetupOpen,
+        isSundayAlertOpen,
+        setIsSundayAlertOpen,
         setActiveSetupTab,
         resetToDemoSchedule,
         addToast,

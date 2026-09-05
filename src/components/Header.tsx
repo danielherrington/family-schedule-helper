@@ -11,7 +11,8 @@ import {
   Users,
   Grid,
   ListTodo,
-  CalendarDays
+  CalendarDays,
+  Bell
 } from 'lucide-react';
 
 export const Header: React.FC = () => {
@@ -24,6 +25,7 @@ export const Header: React.FC = () => {
     setIsSettingsOpen,
     setIsAuditLogOpen,
     setIsSetupOpen,
+    setIsSundayAlertOpen,
     resetToDemoSchedule 
   } = useSchedule();
 
@@ -137,6 +139,17 @@ export const Header: React.FC = () => {
               <span>{gaps.length} Gap{gaps.length === 1 ? '' : 's'}</span>
             </div>
           )}
+
+          {/* Sunday Night Alert Trigger */}
+          <button 
+            className="btn" 
+            onClick={() => setIsSundayAlertOpen(true)}
+            title="Configure Sunday Night Schedule Reminder"
+            style={{ borderColor: 'rgba(255, 94, 126, 0.4)', color: 'var(--accent)' }}
+          >
+            <Bell size={15} />
+            <span className="hide-mobile">Sunday Alert</span>
+          </button>
 
           {/* Audit Log Trigger */}
           <button 

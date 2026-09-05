@@ -11,6 +11,7 @@ import { QuickAssignModal } from './components/QuickAssignModal';
 import { CalendarSettingsModal } from './components/CalendarSettingsModal';
 import { AuditLogModal } from './components/AuditLogModal';
 import { SetupHubModal } from './components/SetupHubModal';
+import { SundayAlertModal } from './components/SundayAlertModal';
 import { CheckCircle2, AlertCircle, Info, AlertTriangle } from 'lucide-react';
 
 export const AppContent: React.FC = () => {
@@ -43,6 +44,7 @@ export const AppContent: React.FC = () => {
 
       {/* Modals */}
       <SetupHubModal />
+      <SundayAlertModal />
       <QuickAssignModal />
       <CalendarSettingsModal />
       <AuditLogModal />
