@@ -83,6 +83,9 @@ export class GoogleCalendarService {
       this.tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: GOOGLE_CLIENT_ID,
         scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/userinfo.email',
+        error_callback: (err: any) => {
+          reject(new Error(err?.message || 'Google OAuth authorization blocked or cancelled. Check Authorized JavaScript origins in Google Cloud Console.'));
+        },
         callback: async (response: any) => {
           if (response.error) {
             reject(new Error(response.error_description || response.error));

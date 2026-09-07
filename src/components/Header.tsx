@@ -115,15 +115,9 @@ export const Header: React.FC = () => {
         <div className="header-controls">
           {/* Add Event Button */}
           <button
-            className="btn btn-primary"
+            className="btn btn-add-event"
             onClick={() => openAddEventModal(selectedDate)}
             title="Schedule a new pickup, drop-off, or activity event"
-            style={{ 
-              fontWeight: 800, 
-              background: 'linear-gradient(135deg, var(--primary) 0%, #0096c7 100%)',
-              color: '#ffffff',
-              boxShadow: '0 2px 8px rgba(0, 180, 216, 0.3)'
-            }}
           >
             <Plus size={16} />
             <span>+ Add Event</span>

@@ -19,6 +19,8 @@
   --text-dim: #94A3B8;
 
   /* Art Deco Signature Colors */
+  --primary: #00B4D8; /* Biscayne Bay Turquoise */
+  --primary-hover: #0096C7;
   --accent: #FF5E7E; /* Miami Flamingo Coral */
   --accent-hover: #E04868;
   --accent-alpha: rgba(255, 94, 126, 0.12);
@@ -191,6 +193,26 @@ button, input, select {
   box-shadow: 0 2px 10px rgba(255, 94, 126, 0.35);
 }
 
+.date-navigator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 2px 6px;
+  height: 38px;
+}
+
+.current-date-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text);
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
@@ -206,6 +228,19 @@ button, input, select {
   color: var(--text);
   min-height: 40px;
   box-shadow: var(--shadow-sm);
+}
+
+.btn-add-event {
+  background: #00B4D8 !important;
+  color: #FFFFFF !important;
+  border: 1px solid #00B4D8 !important;
+  font-weight: 800 !important;
+  box-shadow: 0 2px 8px rgba(0, 180, 216, 0.35) !important;
+}
+
+.btn-add-event:hover {
+  background: #0096C7 !important;
+  border-color: #0096C7 !important;
 }
 
 .btn:hover {

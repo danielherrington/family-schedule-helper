@@ -167,7 +167,6 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const refreshCalendarEvents = async () => {
     if (!GoogleCalendarService.isConnected()) return;
     try {
-      setIsLoading(true);
       const mondayStr = format(currentWeekDays[0], 'yyyy-MM-dd');
       const sundayStr = format(currentWeekDays[6], 'yyyy-MM-dd');
       
@@ -193,50 +192,24 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
     } catch (err: any) {
       console.warn('Google Calendar fetch warning:', err);
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const connectGoogleCalendar = async () => {
     try {
-      setIsLoading(true);
       await GoogleCalendarService.requestAccessToken();
       const email = GoogleCalendarService.getConnectedEmail();
       setConnectedEmail(email);
       setAuthStatus({ mode: 'live_gcal', isConfigured: true });
 
-      const cals = await GoogleCalendarService.listCalendars();
+      const cals = await GoogleCalendarService.listCalendars().catch(() => []);
       setUserCalendars(cals);
 
-      const mondayStr = format(currentWeekDays[0], 'yyyy-MM-dd');
-      const sundayStr = format(currentWeekDays[6], 'yyyy-MM-dd');
-      const rawEvents = await GoogleCalendarService.fetchEventsForRange(activeCalendarId, mondayStr, sundayStr);
-      const parsedEvents: DispatchEvent[] = [];
-
-      for (const raw of rawEvents) {
-        const parsed = GoogleCalendarService.parseGCalEvent(raw, caregivers, childrenList);
-        if (parsed) parsedEvents.push(parsed);
-      }
-
-      if (parsedEvents.length > 0) {
-        setEvents(parsedEvents);
-        setGaps(parsedEvents.filter((e) => e.assignedTo === 'unassigned' && e.status !== 'cancelled' && e.status !== 'no_pickup_needed').map((e) => ({
-          eventId: e.id,
-          title: e.title,
-          childName: e.childId.toUpperCase(),
-          date: e.date,
-          time: `${e.startTime} - ${e.endTime}`,
-          location: e.location,
-          severity: 'high'
-        })));
-      }
-
+      await refreshCalendarEvents();
       addToast(`✨ Live Google Calendar Connected (${email || 'Ready'})`, 'success');
     } catch (err: any) {
       addToast(`Google Sign-In: ${err.message || 'Failed to authenticate'}`, 'error');
-    } finally {
-      setIsLoading(false);
+      throw err;
     }
   };
 
