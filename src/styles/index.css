@@ -101,7 +101,7 @@ button, input, select {
 .app-header {
   background: var(--surface);
   border-bottom: 2px solid var(--border);
-  padding: 12px 16px;
+  padding: 10px 16px;
   position: sticky;
   top: 0;
   z-index: 40;
@@ -109,14 +109,53 @@ button, input, select {
   backdrop-filter: blur(12px);
 }
 
-.header-inner {
+.header-container {
   max-width: 1440px;
   margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.header-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  width: 100%;
+}
+
+.header-row-top {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  padding-bottom: 8px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
   flex-wrap: wrap;
+}
+
+.header-row-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.gap-alert-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
 }
 
 .brand-section {
@@ -163,20 +202,6 @@ button, input, select {
   font-weight: 600;
 }
 
-.header-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.header-controls-center {
-  flex-shrink: 0;
-}
-
-.header-controls-right {
-  flex-shrink: 0;
-}
-
 .btn-toggle-group {
   display: flex;
   background: #F1F5F9;
@@ -209,6 +234,7 @@ button, input, select {
 .date-navigator {
   display: inline-flex;
   align-items: center;
+  justify-content: space-between;
   gap: 4px;
   white-space: nowrap;
   background: var(--surface-card);
@@ -216,6 +242,8 @@ button, input, select {
   border-radius: 10px;
   padding: 2px 6px;
   height: 38px;
+  width: 210px;
+  box-sizing: border-box;
   flex-shrink: 0;
 }
 
@@ -225,9 +253,11 @@ button, input, select {
   color: var(--text);
   padding: 0 4px;
   white-space: nowrap;
-  min-width: 112px;
+  width: 140px;
   text-align: center;
   display: inline-block;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .btn {
@@ -958,25 +988,32 @@ button, input, select {
   .hide-tablet {
     display: none !important;
   }
-  .header-controls {
+  .header-actions {
     gap: 6px;
   }
 }
 
 @media (max-width: 860px) {
-  .header-inner {
-    justify-content: center;
-    gap: 10px;
-  }
-  .header-controls {
+  .header-row {
     flex-wrap: wrap;
-    justify-content: center;
+    gap: 8px;
+  }
+  .header-actions {
+    justify-content: flex-end;
   }
 }
 
 @media (max-width: 640px) {
   .hide-mobile {
     display: none !important;
+  }
+  .header-row-nav {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .date-navigator {
+    width: 100%;
   }
   .weekly-grid-layout {
     grid-template-columns: 1fr;
