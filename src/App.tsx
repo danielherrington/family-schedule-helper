@@ -13,6 +13,7 @@ import { AuditLogModal } from './components/AuditLogModal';
 import { SetupHubModal } from './components/SetupHubModal';
 import { SundayAlertModal } from './components/SundayAlertModal';
 import { AddEventModal } from './components/AddEventModal';
+import { SyncReviewModal } from './components/SyncReviewModal';
 import { CheckCircle2, AlertCircle, Info, AlertTriangle } from 'lucide-react';
 
 export const AppContent: React.FC = () => {
@@ -50,6 +51,7 @@ export const AppContent: React.FC = () => {
       <QuickAssignModal />
       <CalendarSettingsModal />
       <AuditLogModal />
+      <SyncReviewModal />
 
       {/* Toast System */}
       <div className="toast-container">

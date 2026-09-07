@@ -87,3 +87,18 @@ export interface CalendarMapping {
   calendarName: string;
   isPrimary: boolean;
 }
+
+export interface StagedSyncItem {
+  id: string;
+  type: 'reassign' | 'no_pickup' | 'create' | 'delete';
+  eventId: string;
+  eventTitle: string;
+  childId: string;
+  eventDate: string;
+  eventTime: string;
+  summary: string;
+  previousValue?: string;
+  newValue?: string;
+  payload: any;
+  timestamp: number;
+}

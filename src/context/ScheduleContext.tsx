@@ -1,6 +1,15 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { format, addDays, startOfWeek, parseISO } from 'date-fns';
-import { Caregiver, Child, DispatchEvent, ScheduleGap, CaregiverId, EventTemplate, DayHoliday } from '../types/schedule';
+import { 
+  Caregiver, 
+  Child, 
+  DispatchEvent, 
+  ScheduleGap, 
+  CaregiverId, 
+  EventTemplate, 
+  DayHoliday,
+  StagedSyncItem 
+} from '../types/schedule';
 import { 
   DEFAULT_CAREGIVERS, 
   DEFAULT_CHILDREN, 
@@ -36,6 +45,16 @@ interface ScheduleContextType {
   isAddEventOpen: boolean;
   addEventInitialDate: string;
   activeSetupTab: 'caregivers' | 'kids' | 'blueprint';
+
+  // Staged Sync ("Safe Mode")
+  syncMode: 'staged' | 'immediate';
+  setSyncMode: (mode: 'staged' | 'immediate') => void;
+  pendingSyncQueue: StagedSyncItem[];
+  isSyncReviewOpen: boolean;
+  setIsSyncReviewOpen: (open: boolean) => void;
+  pushStagedSyncToGoogle: () => Promise<{ success: boolean; syncedCount: number }>;
+  discardStagedChanges: () => void;
+  removeStagedItem: (id: string) => void;
   userCalendars: import('../services/googleCalendarClient').GCalUserCalendar[];
   activeCalendarId: string;
   connectedEmail: string | null;
@@ -142,6 +161,105 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [isAddEventOpen, setIsAddEventOpen] = useState<boolean>(false);
   const [addEventInitialDate, setAddEventInitialDate] = useState<string>('2026-09-01');
   const [activeSetupTab, setActiveSetupTab] = useState<'caregivers' | 'kids' | 'blueprint'>('caregivers');
+
+  // Staged Sync State ("Safe Mode")
+  const [syncMode, setSyncModeState] = useState<'staged' | 'immediate'>(() => {
+    return (localStorage.getItem('gcal_sync_mode') as 'staged' | 'immediate') || 'staged';
+  });
+  const [pendingSyncQueue, setPendingSyncQueue] = useState<StagedSyncItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('gcal_pending_sync_queue');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [isSyncReviewOpen, setIsSyncReviewOpen] = useState<boolean>(false);
+
+  const setSyncMode = (mode: 'staged' | 'immediate') => {
+    setSyncModeState(mode);
+    localStorage.setItem('gcal_sync_mode', mode);
+    addToast(`Sync Mode: ${mode === 'staged' ? 'Review & Push (Safe Mode)' : 'Immediate Auto-Sync'}`, 'info');
+  };
+
+  const updatePendingQueue = (updater: (prev: StagedSyncItem[]) => StagedSyncItem[]) => {
+    setPendingSyncQueue((prev) => {
+      const next = updater(prev);
+      try {
+        localStorage.setItem('gcal_pending_sync_queue', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const removeStagedItem = (id: string) => {
+    updatePendingQueue((prev) => prev.filter((item) => item.id !== id));
+    addToast('Removed change from sync queue.', 'info');
+  };
+
+  const discardStagedChanges = async () => {
+    updatePendingQueue(() => []);
+    if (GoogleCalendarService.isConnected()) {
+      await refreshCalendarEvents();
+      addToast('Discarded all staged changes. Schedule restored from Google Calendar.', 'info');
+    } else {
+      addToast('Discarded all staged changes.', 'info');
+    }
+    setIsSyncReviewOpen(false);
+  };
+
+  const pushStagedSyncToGoogle = async (): Promise<{ success: boolean; syncedCount: number }> => {
+    if (!GoogleCalendarService.isConnected()) {
+      addToast('Please connect your Google Calendar first.', 'warning');
+      return { success: false, syncedCount: 0 };
+    }
+
+    if (pendingSyncQueue.length === 0) {
+      addToast('No pending changes to sync.', 'info');
+      return { success: true, syncedCount: 0 };
+    }
+
+    setIsLoading(true);
+    let successCount = 0;
+    const errors: string[] = [];
+
+    for (const item of pendingSyncQueue) {
+      try {
+        if (item.type === 'reassign') {
+          const currentEvt = events.find((e) => e.id === item.eventId) || item.payload.event;
+          const targetCg = caregivers.find((c) => c.id === item.payload.targetCaregiverId) || null;
+          await GoogleCalendarService.patchEventAssignment(activeCalendarId, item.eventId, currentEvt, targetCg);
+          successCount++;
+        } else if (item.type === 'no_pickup') {
+          const currentEvt = events.find((e) => e.id === item.eventId) || item.payload.event;
+          await GoogleCalendarService.patchEventNoPickup(activeCalendarId, item.eventId, currentEvt, item.payload.reason || 'No pickup needed');
+          successCount++;
+        } else if (item.type === 'create') {
+          await GoogleCalendarService.createEvent(activeCalendarId, item.payload.createData);
+          successCount++;
+        } else if (item.type === 'delete') {
+          await GoogleCalendarService.deleteEvent(activeCalendarId, item.eventId);
+          successCount++;
+        }
+      } catch (err: any) {
+        console.error('Failed to sync item:', item, err);
+        errors.push(item.summary);
+      }
+    }
+
+    updatePendingQueue(() => []);
+    await refreshCalendarEvents();
+    setIsLoading(false);
+    setIsSyncReviewOpen(false);
+
+    if (errors.length === 0) {
+      addToast(`Successfully pushed ${successCount} change${successCount === 1 ? '' : 's'} to Google Calendar!`, 'success');
+      return { success: true, syncedCount: successCount };
+    } else {
+      addToast(`Synced ${successCount} change(s). ${errors.length} failed.`, 'warning');
+      return { success: false, syncedCount: successCount };
+    }
+  };
 
   const openAddEventModal = (dateStr?: string) => {
     setAddEventInitialDate(dateStr || selectedDate);
@@ -333,8 +451,26 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     })));
 
     if (GoogleCalendarService.isConnected()) {
-      GoogleCalendarService.patchEventAssignment(activeCalendarId, eventId, targetEvent, targetCaregiver || null)
-        .catch((e) => console.warn('GCal patch warning:', e));
+      if (syncMode === 'immediate') {
+        GoogleCalendarService.patchEventAssignment(activeCalendarId, eventId, targetEvent, targetCaregiver || null)
+          .catch((e) => console.warn('GCal patch warning:', e));
+      } else {
+        const staged: StagedSyncItem = {
+          id: `sync-reassign-${eventId}-${Date.now()}`,
+          type: 'reassign',
+          eventId,
+          eventTitle: targetEvent.title,
+          childId: targetEvent.childId,
+          eventDate: targetEvent.date,
+          eventTime: `${targetEvent.startTime} - ${targetEvent.endTime}`,
+          summary: `Reassign Driver: ${targetEvent.title} → ${targetCaregiver ? targetCaregiver.name : 'Unassigned'}`,
+          previousValue: targetEvent.assignedTo,
+          newValue: targetCaregiverId,
+          payload: { targetCaregiverId, event: targetEvent, reason },
+          timestamp: Date.now()
+        };
+        updatePendingQueue((prev) => [...prev.filter((p) => !(p.eventId === eventId && p.type === 'reassign')), staged]);
+      }
     }
 
     try {
@@ -375,8 +511,26 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setGaps((prev) => prev.filter((g) => g.eventId !== eventId));
 
     if (GoogleCalendarService.isConnected()) {
-      GoogleCalendarService.patchEventNoPickup(activeCalendarId, eventId, targetEvent, reason)
-        .catch((e) => console.warn('GCal cancel patch warning:', e));
+      if (syncMode === 'immediate') {
+        GoogleCalendarService.patchEventNoPickup(activeCalendarId, eventId, targetEvent, reason)
+          .catch((e) => console.warn('GCal cancel patch warning:', e));
+      } else {
+        const staged: StagedSyncItem = {
+          id: `sync-cancel-${eventId}-${Date.now()}`,
+          type: 'no_pickup',
+          eventId,
+          eventTitle: targetEvent.title,
+          childId: targetEvent.childId,
+          eventDate: targetEvent.date,
+          eventTime: `${targetEvent.startTime} - ${targetEvent.endTime}`,
+          summary: `Cancelled / No Class: ${targetEvent.title} (${reason})`,
+          previousValue: targetEvent.status,
+          newValue: 'cancelled',
+          payload: { event: targetEvent, reason },
+          timestamp: Date.now()
+        };
+        updatePendingQueue((prev) => [...prev, staged]);
+      }
     }
 
     try {
@@ -412,8 +566,26 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setGaps((prev) => prev.filter((g) => g.eventId !== eventId));
 
     if (GoogleCalendarService.isConnected()) {
-      GoogleCalendarService.patchEventNoPickup(activeCalendarId, eventId, targetEvent, reason)
-        .catch((e) => console.warn('GCal no pickup patch warning:', e));
+      if (syncMode === 'immediate') {
+        GoogleCalendarService.patchEventNoPickup(activeCalendarId, eventId, targetEvent, reason)
+          .catch((e) => console.warn('GCal no pickup patch warning:', e));
+      } else {
+        const staged: StagedSyncItem = {
+          id: `sync-nopickup-${eventId}-${Date.now()}`,
+          type: 'no_pickup',
+          eventId,
+          eventTitle: targetEvent.title,
+          childId: targetEvent.childId,
+          eventDate: targetEvent.date,
+          eventTime: `${targetEvent.startTime} - ${targetEvent.endTime}`,
+          summary: `No Pickup Needed: ${targetEvent.title} (${reason})`,
+          previousValue: targetEvent.status,
+          newValue: 'no_pickup_needed',
+          payload: { event: targetEvent, reason },
+          timestamp: Date.now()
+        };
+        updatePendingQueue((prev) => [...prev, staged]);
+      }
     }
 
     try {
@@ -744,16 +916,44 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setEvents((prev) => [...prev, ...newEventsToAdd]);
 
     if (GoogleCalendarService.isConnected()) {
-      const driver = caregivers.find((c) => c.id === data.assignedTo);
-      GoogleCalendarService.createEvent(activeCalendarId, {
-        title: data.title,
-        date: data.date,
-        startTime: data.startTime,
-        endTime: data.endTime,
-        location: data.location,
-        notes: data.notes,
-        driverName: driver ? driver.name.split(' ')[0] : undefined
-      }).catch((e) => console.warn('GCal create event warning:', e));
+      if (syncMode === 'immediate') {
+        const driver = caregivers.find((c) => c.id === data.assignedTo);
+        GoogleCalendarService.createEvent(activeCalendarId, {
+          title: data.title,
+          date: data.date,
+          startTime: data.startTime,
+          endTime: data.endTime,
+          location: data.location,
+          notes: data.notes,
+          driverName: driver ? driver.name.split(' ')[0] : undefined
+        }).catch((e) => console.warn('GCal create event warning:', e));
+      } else {
+        const driver = caregivers.find((c) => c.id === data.assignedTo);
+        const staged: StagedSyncItem = {
+          id: `sync-create-${newEventsToAdd[0]?.id || Date.now()}`,
+          type: 'create',
+          eventId: newEventsToAdd[0]?.id || `evt-${Date.now()}`,
+          eventTitle: data.title,
+          childId: data.childId,
+          eventDate: data.date,
+          eventTime: `${data.startTime} - ${data.endTime}`,
+          summary: `Create Event: ${data.title} (${driver ? driver.name.split(' ')[0] : 'Unassigned'})`,
+          newValue: driver ? driver.name.split(' ')[0] : 'Unassigned',
+          payload: {
+            createData: {
+              title: data.title,
+              date: data.date,
+              startTime: data.startTime,
+              endTime: data.endTime,
+              location: data.location,
+              notes: data.notes,
+              driverName: driver ? driver.name.split(' ')[0] : undefined
+            }
+          },
+          timestamp: Date.now()
+        };
+        updatePendingQueue((prev) => [...prev, staged]);
+      }
     }
 
     try {
@@ -792,8 +992,24 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     addToast(`🗑️ Permanently removed "${title}" from weekly schedule & blueprint`, 'info');
 
     if (GoogleCalendarService.isConnected()) {
-      GoogleCalendarService.deleteEvent(activeCalendarId, eventId)
-        .catch((e) => console.warn('GCal delete permanent warning:', e));
+      if (syncMode === 'immediate') {
+        GoogleCalendarService.deleteEvent(activeCalendarId, eventId)
+          .catch((e) => console.warn('GCal delete permanent warning:', e));
+      } else {
+        const staged: StagedSyncItem = {
+          id: `sync-delete-${eventId}-${Date.now()}`,
+          type: 'delete',
+          eventId,
+          eventTitle: title,
+          childId: childId || 'unknown',
+          eventDate: targetEvent?.date || '',
+          eventTime: targetEvent ? `${targetEvent.startTime} - ${targetEvent.endTime}` : '',
+          summary: `Delete Event (Blueprint): ${title}`,
+          payload: {},
+          timestamp: Date.now()
+        };
+        updatePendingQueue((prev) => [...prev, staged]);
+      }
     }
 
     try {
@@ -814,8 +1030,24 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     addToast(`Removed "${targetEvent?.title || 'Event'}" from ${targetEvent?.date || 'schedule'}`, 'info');
 
     if (GoogleCalendarService.isConnected()) {
-      GoogleCalendarService.deleteEvent(activeCalendarId, eventId)
-        .catch((e) => console.warn('GCal delete single warning:', e));
+      if (syncMode === 'immediate') {
+        GoogleCalendarService.deleteEvent(activeCalendarId, eventId)
+          .catch((e) => console.warn('GCal delete single warning:', e));
+      } else {
+        const staged: StagedSyncItem = {
+          id: `sync-delete-${eventId}-${Date.now()}`,
+          type: 'delete',
+          eventId,
+          eventTitle: targetEvent?.title || 'Event',
+          childId: targetEvent?.childId || 'unknown',
+          eventDate: targetEvent?.date || '',
+          eventTime: targetEvent ? `${targetEvent.startTime} - ${targetEvent.endTime}` : '',
+          summary: `Delete Event Instance: ${targetEvent?.title || 'Event'} (${targetEvent?.date || ''})`,
+          payload: {},
+          timestamp: Date.now()
+        };
+        updatePendingQueue((prev) => [...prev, staged]);
+      }
     }
 
     try {
@@ -921,6 +1153,14 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         connectGoogleCalendar,
         disconnectGoogleCalendar,
         refreshCalendarEvents,
+        syncMode,
+        setSyncMode,
+        pendingSyncQueue,
+        isSyncReviewOpen,
+        setIsSyncReviewOpen,
+        pushStagedSyncToGoogle,
+        discardStagedChanges,
+        removeStagedItem,
         addNewEvent,
         deletePermanently,
         deleteSingleEvent,

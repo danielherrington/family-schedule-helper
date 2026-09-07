@@ -13,7 +13,8 @@ import {
   ListTodo,
   CalendarDays,
   Bell,
-  Plus
+  Plus,
+  CloudUpload
 } from 'lucide-react';
 
 export const Header: React.FC = () => {
@@ -26,6 +27,8 @@ export const Header: React.FC = () => {
     gaps, 
     authStatus,
     connectedEmail,
+    pendingSyncQueue,
+    setIsSyncReviewOpen,
     setIsSettingsOpen,
     setIsAuditLogOpen,
     setIsSetupOpen,
@@ -86,6 +89,28 @@ export const Header: React.FC = () => {
               <Plus size={16} />
               <span>Add Event</span>
             </button>
+
+            {/* Staged Review & Push Button (Visible when changes are pending) */}
+            {pendingSyncQueue.length > 0 && (
+              <button
+                className="btn btn-review-push"
+                onClick={() => setIsSyncReviewOpen(true)}
+                title={`${pendingSyncQueue.length} pending change(s) staged. Click to review and push to Google Calendar.`}
+                style={{
+                  background: 'linear-gradient(135deg, var(--accent) 0%, #FF758F 100%)',
+                  color: '#fff',
+                  borderColor: 'var(--accent)',
+                  fontWeight: 800,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 2px 10px rgba(255, 94, 126, 0.4)'
+                }}
+              >
+                <CloudUpload size={16} />
+                <span>Review & Push ({pendingSyncQueue.length})</span>
+              </button>
+            )}
 
             {/* Family Setup Hub Button */}
             <button 

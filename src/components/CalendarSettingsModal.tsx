@@ -26,6 +26,8 @@ export const CalendarSettingsModal: React.FC = () => {
     connectGoogleCalendar,
     disconnectGoogleCalendar,
     refreshCalendarEvents,
+    syncMode,
+    setSyncMode,
     isLoading
   } = useSchedule();
 
@@ -154,6 +156,97 @@ export const CalendarSettingsModal: React.FC = () => {
                 </button>
               </div>
             )}
+          </div>
+
+          {/* Sync Protection Mode Card */}
+          <div style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ShieldCheck size={18} color="var(--primary)" />
+                <span style={{ fontWeight: 800, fontSize: '0.92rem' }}>Sync Protection Mode</span>
+              </div>
+              <span 
+                style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  padding: '2px 8px',
+                  borderRadius: '10px',
+                  background: syncMode === 'staged' ? 'rgba(0, 180, 216, 0.15)' : 'rgba(255, 94, 126, 0.15)',
+                  color: syncMode === 'staged' ? 'var(--primary)' : 'var(--accent)'
+                }}
+              >
+                {syncMode === 'staged' ? 'SAFE MODE' : 'IMMEDIATE AUTO-SYNC'}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {/* Option 1: Staged (Safe Mode) */}
+              <label 
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'flex-start', 
+                  gap: '12px',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  border: syncMode === 'staged' ? '2px solid var(--primary)' : '1px solid var(--border)',
+                  background: syncMode === 'staged' ? 'rgba(0, 180, 216, 0.05)' : 'var(--surface)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <input 
+                  type="radio" 
+                  name="syncMode" 
+                  value="staged"
+                  checked={syncMode === 'staged'}
+                  onChange={() => setSyncMode('staged')}
+                  style={{ marginTop: '3px', accentColor: 'var(--primary)' }}
+                />
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>Review & Push (Recommended Safe Mode)</span>
+                    <span style={{ background: 'rgba(5, 150, 105, 0.15)', color: 'var(--success)', fontSize: '0.68rem', fontWeight: 800, padding: '1px 6px', borderRadius: '4px' }}>
+                      SAFEST
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.4 }}>
+                    Make multiple changes locally, review the exact before & after diffs, and push them to Google Calendar in one verified batch. Prevents unintended live calendar edits.
+                  </div>
+                </div>
+              </label>
+
+              {/* Option 2: Immediate Auto-Sync */}
+              <label 
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'flex-start', 
+                  gap: '12px',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  border: syncMode === 'immediate' ? '2px solid var(--accent)' : '1px solid var(--border)',
+                  background: syncMode === 'immediate' ? 'rgba(255, 94, 126, 0.05)' : 'var(--surface)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <input 
+                  type="radio" 
+                  name="syncMode" 
+                  value="immediate"
+                  checked={syncMode === 'immediate'}
+                  onChange={() => setSyncMode('immediate')}
+                  style={{ marginTop: '3px', accentColor: 'var(--accent)' }}
+                />
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text)' }}>
+                    Auto-Sync Immediately
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.4 }}>
+                    Every reassign, cancellation, or addition instantly modifies your live Google Calendar event via the Google Calendar API.
+                  </div>
+                </div>
+              </label>
+            </div>
           </div>
 
           {/* Caregiver Calendar Mappings */}
