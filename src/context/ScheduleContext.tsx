@@ -123,7 +123,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [childrenList, setChildrenList] = useState<Child[]>(DEFAULT_CHILDREN);
   const [templates, setTemplates] = useState<EventTemplate[]>(() => {
     try {
-      const saved = localStorage.getItem('gcal_blueprints');
+      const saved = localStorage.getItem('gcal_blueprints_v2');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -660,12 +660,18 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const resetToDemoSchedule = async () => {
+    try {
+      localStorage.removeItem('gcal_blueprints');
+      localStorage.removeItem('gcal_blueprints_v2');
+      localStorage.removeItem('gcal_pending_sync_queue');
+    } catch (e) {}
     setEvents(DEFAULT_WEEK_EVENTS);
     setCaregivers(DEFAULT_CAREGIVERS);
     setChildrenList(DEFAULT_CHILDREN);
     setTemplates(DEFAULT_TEMPLATES);
+    setPendingSyncQueue([]);
     setHolidays([]);
-    addToast('Reset schedule and blueprint to default family seed.', 'info');
+    addToast('Reset schedule and blueprint to default family seed (alternating drop-offs).', 'info');
     try {
       await fetch('/api/schedule/reset', { method: 'POST' });
     } catch (err) {}
@@ -760,7 +766,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     setTemplates((prev) => {
       const next = [...prev, newTemplate];
-      try { localStorage.setItem('gcal_blueprints', JSON.stringify(next)); } catch (e) {}
+      try { localStorage.setItem('gcal_blueprints_v2', JSON.stringify(next)); } catch (e) {}
       return next;
     });
     addToast(`Added Routine Template "${newTemplate.title}"`, 'success');
@@ -781,7 +787,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   ) => {
     setTemplates((prev) => {
       const next = prev.map((t) => (t.id === id ? { ...t, ...updates } : t));
-      try { localStorage.setItem('gcal_blueprints', JSON.stringify(next)); } catch (e) {}
+      try { localStorage.setItem('gcal_blueprints_v2', JSON.stringify(next)); } catch (e) {}
       return next;
     });
 
@@ -821,7 +827,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const deleteTemplate = async (id: string) => {
     setTemplates((prev) => {
       const next = prev.filter((t) => t.id !== id);
-      try { localStorage.setItem('gcal_blueprints', JSON.stringify(next)); } catch (e) {}
+      try { localStorage.setItem('gcal_blueprints_v2', JSON.stringify(next)); } catch (e) {}
       return next;
     });
     addToast('Template removed from blueprint.', 'info');

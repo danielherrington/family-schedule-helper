@@ -14,7 +14,8 @@ import {
   Clock,
   MapPin,
   HelpCircle,
-  Play
+  Play,
+  RotateCcw
 } from 'lucide-react';
 
 export const SetupHubModal: React.FC = () => {
@@ -34,6 +35,8 @@ export const SetupHubModal: React.FC = () => {
     updateTemplate,
     deleteTemplate,
     applyWeeklyBlueprint,
+    resetToDemoSchedule,
+    currentWeekDays,
     selectedDate
   } = useSchedule();
 
@@ -454,14 +457,36 @@ export const SetupHubModal: React.FC = () => {
                 <div>
                   💡 <strong>Event Blueprint</strong> is your master weekly routine (e.g. *"Vale Drop Off Mon–Fri"*, *"Izzy Gymnastics Tue/Thu"*).
                 </div>
-                <button 
-                  className="btn btn-primary" 
-                  onClick={() => applyWeeklyBlueprint('2026-08-31')}
-                  style={{ whiteSpace: 'nowrap' }}
-                >
-                  <Sparkles size={16} />
-                  <span>Apply Blueprint to Week</span>
-                </button>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <button 
+                    type="button"
+                    className="btn btn-secondary" 
+                    onClick={() => {
+                      if (confirm('Reset your weekly blueprint to default family routine (Vale/Izzy alternating drop-offs)?')) {
+                        resetToDemoSchedule();
+                      }
+                    }}
+                    style={{ whiteSpace: 'nowrap', fontSize: '0.82rem' }}
+                    title="Restore default family blueprints (alternating drop-offs)"
+                  >
+                    <RotateCcw size={14} />
+                    <span>Reset to Defaults</span>
+                  </button>
+                  <button 
+                    type="button"
+                    className="btn btn-primary" 
+                    onClick={() => {
+                      const mondayStr = currentWeekDays && currentWeekDays[0] 
+                        ? currentWeekDays[0].toISOString().split('T')[0] 
+                        : '2026-08-31';
+                      applyWeeklyBlueprint(mondayStr);
+                    }}
+                    style={{ whiteSpace: 'nowrap' }}
+                  >
+                    <Sparkles size={16} />
+                    <span>Apply Blueprint to Week</span>
+                  </button>
+                </div>
               </div>
 
               {/* Existing Templates */}
