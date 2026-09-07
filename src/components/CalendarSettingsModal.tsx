@@ -1,40 +1,60 @@
 import React, { useState } from 'react';
 import { useSchedule } from '../context/ScheduleContext';
-import { X, Key, Calendar, ShieldCheck, CheckCircle2, ExternalLink } from 'lucide-react';
+import { 
+  X, 
+  Calendar, 
+  ShieldCheck, 
+  CheckCircle2, 
+  ExternalLink, 
+  RotateCcw, 
+  LogOut, 
+  RefreshCw, 
+  Check, 
+  Sparkles 
+} from 'lucide-react';
 
 export const CalendarSettingsModal: React.FC = () => {
-  const { isSettingsOpen, setIsSettingsOpen, authStatus, caregivers } = useSchedule();
-  const [clientId, setClientId] = useState('');
-  const [clientSecret, setClientSecret] = useState('');
+  const { 
+    isSettingsOpen, 
+    setIsSettingsOpen, 
+    authStatus, 
+    caregivers,
+    userCalendars,
+    activeCalendarId,
+    setActiveCalendarId,
+    connectedEmail,
+    connectGoogleCalendar,
+    disconnectGoogleCalendar,
+    refreshCalendarEvents,
+    isLoading
+  } = useSchedule();
+
   const [isConnecting, setIsConnecting] = useState(false);
 
   if (!isSettingsOpen) return null;
 
-  const handleConnectGoogle = async () => {
+  const handleConnect = async () => {
     setIsConnecting(true);
     try {
-      const res = await fetch('/api/auth/google/url');
-      const data = await res.json();
-      if (data.authUrl) {
-        window.open(data.authUrl, '_blank');
-      } else {
-        alert('To enable Live Google Calendar OAuth, provide GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env or Google Cloud Console.');
-      }
-    } catch (err) {
-      alert('Could not initiate Google OAuth.');
+      await connectGoogleCalendar();
     } finally {
       setIsConnecting(false);
     }
   };
 
+  const isLive = authStatus.mode === 'live_gcal';
+
   return (
     <div className="modal-overlay" onClick={() => setIsSettingsOpen(false)}>
-      <div className="modal-card" style={{ maxWidth: '620px' }} onClick={(e) => e.stopPropagation()}>
+      <div className="modal-card" style={{ maxWidth: '640px' }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div>
-            <div className="modal-title">Calendar Sync & Manager Settings</div>
+            <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Calendar size={20} color="var(--primary)" />
+              <span>Google Calendar Live Sync Settings</span>
+            </div>
             <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-              Configure Google OAuth 2.0 and Family Calendar ID mappings
+              Configure live Google OAuth 2.0 and Family Calendar mappings
             </div>
           </div>
           <button className="nav-btn" onClick={() => setIsSettingsOpen(false)}>
@@ -43,35 +63,103 @@ export const CalendarSettingsModal: React.FC = () => {
         </div>
 
         <div className="modal-body">
-          {/* Manager Auth Status */}
-          <div style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '16px' }}>
+          {/* Manager Auth Card */}
+          <div style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '18px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <ShieldCheck size={20} color={authStatus.mode === 'live_gcal' ? 'var(--success)' : 'var(--accent)'} />
-                <span style={{ fontWeight: 800 }}>Manager Authentication (Parents)</span>
+                <ShieldCheck size={20} color={isLive ? 'var(--success)' : 'var(--accent)'} />
+                <span style={{ fontWeight: 800 }}>Google Account Connection</span>
               </div>
-              <span className={`status-indicator ${authStatus.mode === 'live_gcal' ? 'status-confirmed' : ''}`}>
-                {authStatus.mode === 'live_gcal' ? '● Connected to Google API' : '● Running in Demo Mode'}
+              <span className={`status-indicator ${isLive ? 'status-confirmed' : ''}`} style={{ fontWeight: 700 }}>
+                {isLive ? '● Live Google Calendar Connected' : '● Demo / Blueprint Mode'}
               </span>
             </div>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
-              Only managers (Daniel & Lucila) authenticate. Caregivers (Elizabeth, Matilda) do not need logins; the helper updates their shared Google calendars via manager authorization.
-            </p>
-            <button 
-              className="btn btn-primary"
-              onClick={handleConnectGoogle}
-              disabled={isConnecting}
-              style={{ width: '100%', justifyContent: 'center' }}
-            >
-              <ExternalLink size={16} />
-              <span>{authStatus.mode === 'live_gcal' ? 'Re-authenticate Google Account' : 'Connect Google Calendar Account'}</span>
-            </button>
+
+            {isLive ? (
+              <div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text)', marginBottom: '14px' }}>
+                  Connected as: <strong style={{ color: 'var(--primary)' }}>{connectedEmail || 'Authenticated User'}</strong>
+                </div>
+
+                {/* Active Calendar Picker */}
+                {userCalendars.length > 0 && (
+                  <div style={{ marginBottom: '14px' }}>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', display: 'block' }}>
+                      Syncing with Google Calendar:
+                    </label>
+                    <select
+                      value={activeCalendarId}
+                      onChange={(e) => setActiveCalendarId(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid var(--border)',
+                        background: 'var(--surface)',
+                        color: 'var(--text)',
+                        fontSize: '0.9rem',
+                        fontWeight: 600
+                      }}
+                    >
+                      {userCalendars.map((cal) => (
+                        <option key={cal.id} value={cal.id}>
+                          {cal.summary} {cal.primary ? '(Primary)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  <button 
+                    className="btn btn-primary"
+                    onClick={refreshCalendarEvents}
+                    disabled={isLoading}
+                    style={{ flex: 1, justifyContent: 'center' }}
+                  >
+                    <RefreshCw size={15} className={isLoading ? 'spin' : ''} />
+                    <span>Refresh Calendar Events</span>
+                  </button>
+
+                  <button 
+                    className="btn"
+                    onClick={disconnectGoogleCalendar}
+                    style={{ color: 'var(--danger)', borderColor: 'rgba(239, 68, 68, 0.4)' }}
+                  >
+                    <LogOut size={15} />
+                    <span>Disconnect</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '14px', lineHeight: 1.5 }}>
+                  Click below to sign in with your Google account (<strong>daniel.j.herrington@gmail.com</strong>). The app will read your real pickup/drop-off calendar events and keep driver assignments in sync directly from your browser!
+                </p>
+
+                <button 
+                  className="btn btn-primary"
+                  onClick={handleConnect}
+                  disabled={isConnecting}
+                  style={{ 
+                    width: '100%', 
+                    justifyContent: 'center', 
+                    padding: '12px 18px', 
+                    fontWeight: 800,
+                    boxShadow: '0 2px 10px rgba(0, 180, 216, 0.3)'
+                  }}
+                >
+                  <ExternalLink size={16} />
+                  <span>{isConnecting ? 'Opening Google Sign-In...' : 'Connect Google Calendar (daniel.j.herrington@gmail.com)'}</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Caregiver Calendar Mappings */}
           <div>
             <div style={{ fontSize: '0.9rem', fontWeight: 800, marginBottom: '8px' }}>
-              Configured Caregiver Google Calendars:
+              Caregiver Calendar / Email Mappings:
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {caregivers.map((cg) => (
@@ -93,7 +181,7 @@ export const CalendarSettingsModal: React.FC = () => {
                       {cg.avatarInitials}
                     </div>
                     <div>
-                      <div style={{ fontWeight: 700 }}>{cg.name}</div>
+                      <div style={{ fontWeight: 700 }}>{cg.name} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>({cg.role})</span></div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
                         {cg.calendarId}
                       </div>

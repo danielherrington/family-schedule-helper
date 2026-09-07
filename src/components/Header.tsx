@@ -23,6 +23,8 @@ export const Header: React.FC = () => {
     setViewMode, 
     changeDateByDays, 
     gaps, 
+    authStatus,
+    connectedEmail,
     setIsSettingsOpen,
     setIsAuditLogOpen,
     setIsSetupOpen,
@@ -179,14 +181,20 @@ export const Header: React.FC = () => {
             <span className="hide-mobile">Audit</span>
           </button>
 
-          {/* Settings Modal */}
+          {/* Settings Modal / Google Sync Status */}
           <button 
             className="btn" 
             onClick={() => setIsSettingsOpen(true)}
-            title="Google Calendar & OAuth Sync Settings"
+            title={authStatus.mode === 'live_gcal' ? `Connected to Google Calendar (${connectedEmail || 'Live'})` : "Connect Google Calendar"}
+            style={{
+              borderColor: authStatus.mode === 'live_gcal' ? 'var(--success)' : undefined,
+              color: authStatus.mode === 'live_gcal' ? 'var(--success)' : undefined,
+              background: authStatus.mode === 'live_gcal' ? 'rgba(5, 150, 105, 0.08)' : undefined,
+              fontWeight: authStatus.mode === 'live_gcal' ? 700 : undefined
+            }}
           >
             <Settings size={16} />
-            <span className="hide-mobile">Google Sync</span>
+            <span className="hide-mobile">{authStatus.mode === 'live_gcal' ? '● Google Live' : 'Google Sync'}</span>
           </button>
 
           {/* Reset Demo */}

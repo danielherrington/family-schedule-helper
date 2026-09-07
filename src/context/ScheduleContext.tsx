@@ -7,6 +7,7 @@ import {
   DEFAULT_TEMPLATES, 
   DEFAULT_WEEK_EVENTS 
 } from './defaultSeed';
+import { GoogleCalendarService, GCalUserCalendar } from '../services/googleCalendarClient';
 
 interface Toast {
   id: string;
@@ -35,6 +36,9 @@ interface ScheduleContextType {
   isAddEventOpen: boolean;
   addEventInitialDate: string;
   activeSetupTab: 'caregivers' | 'kids' | 'blueprint';
+  userCalendars: import('../services/googleCalendarClient').GCalUserCalendar[];
+  activeCalendarId: string;
+  connectedEmail: string | null;
   
   // Actions
   setSelectedDate: (date: string) => void;
@@ -56,6 +60,12 @@ interface ScheduleContextType {
   addToast: (message: string, type?: 'success' | 'info' | 'warning' | 'error') => void;
   removeToast: (id: string) => void;
   changeDateByDays: (days: number) => void;
+
+  // Google Calendar Live Sync Actions
+  connectGoogleCalendar: () => Promise<void>;
+  disconnectGoogleCalendar: () => void;
+  setActiveCalendarId: (calendarId: string) => void;
+  refreshCalendarEvents: () => Promise<void>;
 
   // Event & Blueprint Management
   addNewEvent: (data: {
@@ -108,9 +118,12 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [authStatus, setAuthStatus] = useState<{ mode: 'demo_mode' | 'live_gcal'; isConfigured: boolean }>({
-    mode: 'demo_mode',
-    isConfigured: false
+    mode: GoogleCalendarService.isConnected() ? 'live_gcal' : 'demo_mode',
+    isConfigured: GoogleCalendarService.isConnected()
   });
+  const [userCalendars, setUserCalendars] = useState<GCalUserCalendar[]>([]);
+  const [activeCalendarId, setActiveCalendarIdState] = useState<string>(GoogleCalendarService.getActiveCalendarId());
+  const [connectedEmail, setConnectedEmail] = useState<string | null>(GoogleCalendarService.getConnectedEmail());
   const [reassignModalEvent, setReassignModalEvent] = useState<DispatchEvent | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isAuditLogOpen, setIsAuditLogOpen] = useState<boolean>(false);
@@ -123,6 +136,11 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const openAddEventModal = (dateStr?: string) => {
     setAddEventInitialDate(dateStr || selectedDate);
     setIsAddEventOpen(true);
+  };
+
+  const setActiveCalendarId = (calendarId: string) => {
+    setActiveCalendarIdState(calendarId);
+    GoogleCalendarService.setActiveCalendarId(calendarId);
   };
 
   const currentWeekDays = useMemo(() => {
@@ -146,8 +164,98 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
+  const refreshCalendarEvents = async () => {
+    if (!GoogleCalendarService.isConnected()) return;
+    try {
+      setIsLoading(true);
+      const mondayStr = format(currentWeekDays[0], 'yyyy-MM-dd');
+      const sundayStr = format(currentWeekDays[6], 'yyyy-MM-dd');
+      
+      const rawEvents = await GoogleCalendarService.fetchEventsForRange(activeCalendarId, mondayStr, sundayStr);
+      const parsedEvents: DispatchEvent[] = [];
+
+      for (const raw of rawEvents) {
+        const parsed = GoogleCalendarService.parseGCalEvent(raw, caregivers, childrenList);
+        if (parsed) parsedEvents.push(parsed);
+      }
+
+      if (parsedEvents.length > 0) {
+        setEvents(parsedEvents);
+        setGaps(parsedEvents.filter((e) => e.assignedTo === 'unassigned' && e.status !== 'cancelled' && e.status !== 'no_pickup_needed').map((e) => ({
+          eventId: e.id,
+          title: e.title,
+          childName: e.childId.toUpperCase(),
+          date: e.date,
+          time: `${e.startTime} - ${e.endTime}`,
+          location: e.location,
+          severity: 'high'
+        })));
+      }
+    } catch (err: any) {
+      console.warn('Google Calendar fetch warning:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const connectGoogleCalendar = async () => {
+    try {
+      setIsLoading(true);
+      await GoogleCalendarService.requestAccessToken();
+      const email = GoogleCalendarService.getConnectedEmail();
+      setConnectedEmail(email);
+      setAuthStatus({ mode: 'live_gcal', isConfigured: true });
+
+      const cals = await GoogleCalendarService.listCalendars();
+      setUserCalendars(cals);
+
+      const mondayStr = format(currentWeekDays[0], 'yyyy-MM-dd');
+      const sundayStr = format(currentWeekDays[6], 'yyyy-MM-dd');
+      const rawEvents = await GoogleCalendarService.fetchEventsForRange(activeCalendarId, mondayStr, sundayStr);
+      const parsedEvents: DispatchEvent[] = [];
+
+      for (const raw of rawEvents) {
+        const parsed = GoogleCalendarService.parseGCalEvent(raw, caregivers, childrenList);
+        if (parsed) parsedEvents.push(parsed);
+      }
+
+      if (parsedEvents.length > 0) {
+        setEvents(parsedEvents);
+        setGaps(parsedEvents.filter((e) => e.assignedTo === 'unassigned' && e.status !== 'cancelled' && e.status !== 'no_pickup_needed').map((e) => ({
+          eventId: e.id,
+          title: e.title,
+          childName: e.childId.toUpperCase(),
+          date: e.date,
+          time: `${e.startTime} - ${e.endTime}`,
+          location: e.location,
+          severity: 'high'
+        })));
+      }
+
+      addToast(`✨ Live Google Calendar Connected (${email || 'Ready'})`, 'success');
+    } catch (err: any) {
+      addToast(`Google Sign-In: ${err.message || 'Failed to authenticate'}`, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const disconnectGoogleCalendar = () => {
+    GoogleCalendarService.disconnect();
+    setAuthStatus({ mode: 'demo_mode', isConfigured: false });
+    setConnectedEmail(null);
+    setUserCalendars([]);
+    addToast('Disconnected Google Calendar. Switched to local mode.', 'info');
+  };
+
   const fetchData = async () => {
     try {
+      if (GoogleCalendarService.isConnected()) {
+        const cals = await GoogleCalendarService.listCalendars().catch(() => []);
+        if (cals.length > 0) setUserCalendars(cals);
+        await refreshCalendarEvents();
+      }
+
       const [rosterRes, scheduleRes, statusRes, gapsRes] = await Promise.all([
         fetch('/api/roster').catch(() => null),
         fetch('/api/schedule').catch(() => null),
@@ -163,17 +271,19 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (rosterData.holidays) setHolidays(rosterData.holidays);
       }
 
-      if (scheduleRes && scheduleRes.ok) {
+      if (!GoogleCalendarService.isConnected() && scheduleRes && scheduleRes.ok) {
         const scheduleData = await scheduleRes.json();
         if (scheduleData.events?.length) setEvents(scheduleData.events);
       }
 
       if (statusRes && statusRes.ok) {
         const statusData = await statusRes.json();
-        setAuthStatus({
-          mode: statusData.mode || 'demo_mode',
-          isConfigured: statusData.gcalStatus?.isConfigured || false
-        });
+        if (!GoogleCalendarService.isConnected()) {
+          setAuthStatus({
+            mode: statusData.mode || 'demo_mode',
+            isConfigured: statusData.gcalStatus?.isConfigured || false
+          });
+        }
       }
 
       if (gapsRes && gapsRes.ok) {
@@ -188,6 +298,12 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    if (GoogleCalendarService.isConnected()) {
+      refreshCalendarEvents();
+    }
+  }, [selectedDate, activeCalendarId]);
 
   const changeDateByDays = (days: number) => {
     const curr = new Date(selectedDate + 'T12:00:00');
@@ -233,6 +349,11 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       severity: 'high'
     })));
 
+    if (GoogleCalendarService.isConnected()) {
+      GoogleCalendarService.patchEventAssignment(activeCalendarId, eventId, targetEvent, targetCaregiver || null)
+        .catch((e) => console.warn('GCal patch warning:', e));
+    }
+
     try {
       await fetch('/api/schedule/reassign', {
         method: 'POST',
@@ -270,6 +391,11 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     // Remove from gaps
     setGaps((prev) => prev.filter((g) => g.eventId !== eventId));
 
+    if (GoogleCalendarService.isConnected()) {
+      GoogleCalendarService.patchEventNoPickup(activeCalendarId, eventId, targetEvent, reason)
+        .catch((e) => console.warn('GCal cancel patch warning:', e));
+    }
+
     try {
       await fetch('/api/schedule/cancel-event', {
         method: 'POST',
@@ -301,6 +427,11 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     // Remove from gaps so no false alarms are triggered
     setGaps((prev) => prev.filter((g) => g.eventId !== eventId));
+
+    if (GoogleCalendarService.isConnected()) {
+      GoogleCalendarService.patchEventNoPickup(activeCalendarId, eventId, targetEvent, reason)
+        .catch((e) => console.warn('GCal no pickup patch warning:', e));
+    }
 
     try {
       await fetch('/api/schedule/no-pickup-needed', {
@@ -577,6 +708,19 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     setEvents((prev) => [...prev, ...newEventsToAdd]);
 
+    if (GoogleCalendarService.isConnected()) {
+      const driver = caregivers.find((c) => c.id === data.assignedTo);
+      GoogleCalendarService.createEvent(activeCalendarId, {
+        title: data.title,
+        date: data.date,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        location: data.location,
+        notes: data.notes,
+        driverName: driver ? driver.name.split(' ')[0] : undefined
+      }).catch((e) => console.warn('GCal create event warning:', e));
+    }
+
     try {
       await fetch('/api/schedule/add-event', {
         method: 'POST',
@@ -612,6 +756,11 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     addToast(`🗑️ Permanently removed "${title}" from weekly schedule & blueprint`, 'info');
 
+    if (GoogleCalendarService.isConnected()) {
+      GoogleCalendarService.deleteEvent(activeCalendarId, eventId)
+        .catch((e) => console.warn('GCal delete permanent warning:', e));
+    }
+
     try {
       await fetch('/api/schedule/delete-permanent', {
         method: 'POST',
@@ -628,6 +777,11 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setGaps((prev) => prev.filter((g) => g.eventId !== eventId));
 
     addToast(`Removed "${targetEvent?.title || 'Event'}" from ${targetEvent?.date || 'schedule'}`, 'info');
+
+    if (GoogleCalendarService.isConnected()) {
+      GoogleCalendarService.deleteEvent(activeCalendarId, eventId)
+        .catch((e) => console.warn('GCal delete single warning:', e));
+    }
 
     try {
       await fetch(`/api/schedule/events/${eventId}`, { method: 'DELETE' });
@@ -725,6 +879,13 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         addToast,
         removeToast,
         changeDateByDays,
+        userCalendars,
+        activeCalendarId,
+        setActiveCalendarId,
+        connectedEmail,
+        connectGoogleCalendar,
+        disconnectGoogleCalendar,
+        refreshCalendarEvents,
         addNewEvent,
         deletePermanently,
         deleteSingleEvent,
