@@ -22,6 +22,7 @@ export const Header: React.FC = () => {
     viewMode, 
     setViewMode, 
     changeDateByDays, 
+    currentWeekDays,
     gaps, 
     authStatus,
     connectedEmail,
@@ -42,6 +43,21 @@ export const Header: React.FC = () => {
     });
   };
 
+  const formatWeekRangeLabel = (days: Date[]) => {
+    if (!days || days.length === 0) return '';
+    const start = days[0];
+    const end = days[days.length - 1];
+    const startMonth = start.toLocaleDateString('en-US', { month: 'short' });
+    const endMonth = end.toLocaleDateString('en-US', { month: 'short' });
+    const startDay = start.getDate();
+    const endDay = end.getDate();
+
+    if (startMonth === endMonth) {
+      return `${startMonth} ${startDay} – ${endDay}`;
+    }
+    return `${startMonth} ${startDay} – ${endMonth} ${endDay}`;
+  };
+
   return (
     <header className="app-header">
       <div className="header-inner">
@@ -59,8 +75,8 @@ export const Header: React.FC = () => {
           </div>
         </div>
 
-        {/* Center Controls: 3-Way View Switcher */}
-        <div className="header-controls">
+        {/* Center Controls: 3-Way View Switcher + Persistent Date/Range Navigator */}
+        <div className="header-controls header-controls-center">
           <div className="btn-toggle-group">
             <button
               className={`toggle-item ${viewMode === 'calendar' ? 'active' : ''}`}
@@ -88,31 +104,29 @@ export const Header: React.FC = () => {
             </button>
           </div>
 
-          {viewMode === 'daily' && (
-            <div className="date-navigator">
-              <button 
-                className="nav-btn" 
-                onClick={() => changeDateByDays(-1)}
-                title="Previous Day"
-              >
-                <ChevronLeft size={18} />
-              </button>
-              <span className="current-date-label">
-                {formatDateLabel(selectedDate)}
-              </span>
-              <button 
-                className="nav-btn" 
-                onClick={() => changeDateByDays(1)}
-                title="Next Day"
-              >
-                <ChevronRight size={18} />
-              </button>
-            </div>
-          )}
+          <div className="date-navigator">
+            <button 
+              className="nav-btn" 
+              onClick={() => changeDateByDays(viewMode === 'daily' ? -1 : -7)}
+              title={viewMode === 'daily' ? "Previous Day" : "Previous Week"}
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <span className="current-date-label">
+              {viewMode === 'daily' ? formatDateLabel(selectedDate) : formatWeekRangeLabel(currentWeekDays)}
+            </span>
+            <button 
+              className="nav-btn" 
+              onClick={() => changeDateByDays(viewMode === 'daily' ? 1 : 7)}
+              title={viewMode === 'daily' ? "Next Day" : "Next Week"}
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Right Controls: Add Event, Setup Hub, Gaps, Settings */}
-        <div className="header-controls">
+        <div className="header-controls header-controls-right">
           {/* Add Event Button */}
           <button
             className="btn btn-add-event"
@@ -120,7 +134,7 @@ export const Header: React.FC = () => {
             title="Schedule a new pickup, drop-off, or activity event"
           >
             <Plus size={16} />
-            <span>+ Add Event</span>
+            <span>Add Event</span>
           </button>
 
           {/* Family Setup Hub Button */}
@@ -162,7 +176,7 @@ export const Header: React.FC = () => {
             style={{ borderColor: 'rgba(255, 94, 126, 0.4)', color: 'var(--accent)' }}
           >
             <Bell size={15} />
-            <span className="hide-mobile">Sunday Alert</span>
+            <span className="hide-tablet">Sunday Alert</span>
           </button>
 
           {/* Audit Log Trigger */}
@@ -172,7 +186,7 @@ export const Header: React.FC = () => {
             title="View Single-Instance Exceptions Audit Log"
           >
             <FileText size={16} />
-            <span className="hide-mobile">Audit</span>
+            <span className="hide-tablet">Audit</span>
           </button>
 
           {/* Settings Modal / Google Sync Status */}
@@ -188,7 +202,7 @@ export const Header: React.FC = () => {
             }}
           >
             <Settings size={16} />
-            <span className="hide-mobile">{authStatus.mode === 'live_gcal' ? '● Google Live' : 'Google Sync'}</span>
+            <span className="hide-tablet">{authStatus.mode === 'live_gcal' ? '● Live' : 'Sync'}</span>
           </button>
 
           {/* Reset Demo */}

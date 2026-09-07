@@ -169,7 +169,7 @@ export const DailyDispatchBoard: React.FC = () => {
             title="Add pickup, drop-off, or activity for this day"
           >
             <Plus size={15} />
-            <span>+ Add Event</span>
+            <span>Add Event</span>
           </button>
 
           <button
