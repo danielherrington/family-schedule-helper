@@ -64,10 +64,10 @@ export const CalendarSettingsModal: React.FC = () => {
           </button>
         </div>
 
-        <div className="modal-body">
+        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {/* Manager Auth Card */}
-          <div style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '18px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+          <div style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '14px 16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <ShieldCheck size={20} color={isLive ? 'var(--success)' : 'var(--accent)'} />
                 <span style={{ fontWeight: 800 }}>Google Account Connection</span>
@@ -159,8 +159,8 @@ export const CalendarSettingsModal: React.FC = () => {
           </div>
 
           {/* Sync Protection Mode Card */}
-          <div style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+          <div style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '14px 16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <ShieldCheck size={18} color="var(--primary)" />
                 <span style={{ fontWeight: 800, fontSize: '0.92rem' }}>Sync Protection Mode</span>
@@ -179,14 +179,14 @@ export const CalendarSettingsModal: React.FC = () => {
               </span>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {/* Option 1: Staged (Safe Mode) */}
               <label 
                 style={{ 
                   display: 'flex', 
                   alignItems: 'flex-start', 
-                  gap: '12px',
-                  padding: '12px',
+                  gap: '10px',
+                  padding: '10px 12px',
                   borderRadius: '8px',
                   border: syncMode === 'staged' ? '2px solid var(--primary)' : '1px solid var(--border)',
                   background: syncMode === 'staged' ? 'rgba(0, 180, 216, 0.05)' : 'var(--surface)',
@@ -220,8 +220,8 @@ export const CalendarSettingsModal: React.FC = () => {
                 style={{ 
                   display: 'flex', 
                   alignItems: 'flex-start', 
-                  gap: '12px',
-                  padding: '12px',
+                  gap: '10px',
+                  padding: '10px 12px',
                   borderRadius: '8px',
                   border: syncMode === 'immediate' ? '2px solid var(--accent)' : '1px solid var(--border)',
                   background: syncMode === 'immediate' ? 'rgba(255, 94, 126, 0.05)' : 'var(--surface)',
@@ -251,10 +251,10 @@ export const CalendarSettingsModal: React.FC = () => {
 
           {/* Caregiver Calendar Mappings */}
           <div>
-            <div style={{ fontSize: '0.9rem', fontWeight: 800, marginBottom: '8px' }}>
+            <div style={{ fontSize: '0.88rem', fontWeight: 800, marginBottom: '6px' }}>
               Caregiver Calendar / Email Mappings:
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {caregivers.map((cg) => (
                 <div 
                   key={cg.id}
@@ -262,11 +262,11 @@ export const CalendarSettingsModal: React.FC = () => {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '10px 14px',
+                    padding: '8px 12px',
                     background: 'var(--surface-card)',
                     border: '1px solid var(--border)',
                     borderRadius: '8px',
-                    fontSize: '0.85rem'
+                    fontSize: '0.82rem'
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
