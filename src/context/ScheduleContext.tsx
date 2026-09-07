@@ -90,6 +90,7 @@ interface ScheduleContextType {
   addChild: (data: Partial<Child>) => Promise<void>;
   deleteChild: (id: string) => Promise<void>;
   addTemplate: (data: Partial<EventTemplate>) => Promise<void>;
+  updateTemplate: (id: string, updates: Partial<EventTemplate>, updateCurrentWeekEvents?: boolean) => Promise<void>;
   deleteTemplate: (id: string) => Promise<void>;
   applyWeeklyBlueprint: (mondayDateStr: string) => Promise<void>;
 }
@@ -101,7 +102,16 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [viewMode, setViewMode] = useState<'calendar' | 'daily' | 'weekly'>('calendar');
   const [caregivers, setCaregivers] = useState<Caregiver[]>(DEFAULT_CAREGIVERS);
   const [childrenList, setChildrenList] = useState<Child[]>(DEFAULT_CHILDREN);
-  const [templates, setTemplates] = useState<EventTemplate[]>(DEFAULT_TEMPLATES);
+  const [templates, setTemplates] = useState<EventTemplate[]>(() => {
+    try {
+      const saved = localStorage.getItem('gcal_blueprints');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return DEFAULT_TEMPLATES;
+  });
   const [events, setEvents] = useState<DispatchEvent[]>(DEFAULT_WEEK_EVENTS);
   const [holidays, setHolidays] = useState<DayHoliday[]>([]);
   const [gaps, setGaps] = useState<ScheduleGap[]>([
@@ -576,7 +586,11 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       notes: data.notes
     };
 
-    setTemplates((prev) => [...prev, newTemplate]);
+    setTemplates((prev) => {
+      const next = [...prev, newTemplate];
+      try { localStorage.setItem('gcal_blueprints', JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
     addToast(`Added Routine Template "${newTemplate.title}"`, 'success');
 
     try {
@@ -588,8 +602,56 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } catch (err) {}
   };
 
+  const updateTemplate = async (
+    id: string, 
+    updates: Partial<EventTemplate>, 
+    updateCurrentWeekEvents: boolean = true
+  ) => {
+    setTemplates((prev) => {
+      const next = prev.map((t) => (t.id === id ? { ...t, ...updates } : t));
+      try { localStorage.setItem('gcal_blueprints', JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
+
+    if (updateCurrentWeekEvents) {
+      setEvents((prev) =>
+        prev.map((evt) => {
+          if (evt.masterSeriesId === id || evt.id.includes(id)) {
+            return {
+              ...evt,
+              title: updates.title !== undefined ? updates.title : evt.title,
+              childId: updates.childId !== undefined ? updates.childId : evt.childId,
+              category: updates.category !== undefined ? updates.category : evt.category,
+              startTime: updates.startTime !== undefined ? updates.startTime : evt.startTime,
+              endTime: updates.endTime !== undefined ? updates.endTime : evt.endTime,
+              location: updates.location !== undefined ? updates.location : evt.location,
+              assignedTo: updates.defaultCaregiverId !== undefined && (evt.assignedTo === 'unassigned' || !evt.isException)
+                ? updates.defaultCaregiverId
+                : evt.assignedTo
+            };
+          }
+          return evt;
+        })
+      );
+    }
+
+    addToast(`Updated blueprint "${updates.title || 'Event'}"`, 'success');
+
+    try {
+      await fetch(`/api/templates/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+    } catch (err) {}
+  };
+
   const deleteTemplate = async (id: string) => {
-    setTemplates((prev) => prev.filter((t) => t.id !== id));
+    setTemplates((prev) => {
+      const next = prev.filter((t) => t.id !== id);
+      try { localStorage.setItem('gcal_blueprints', JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
     addToast('Template removed from blueprint.', 'info');
     try {
       await fetch(`/api/templates/${id}`, { method: 'DELETE' });
@@ -867,6 +929,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         addChild,
         deleteChild,
         addTemplate,
+        updateTemplate,
         deleteTemplate,
         applyWeeklyBlueprint
       }}

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useSchedule } from '../context/ScheduleContext';
+import { EventTemplate } from '../types/schedule';
 import { 
   X, 
   Users, 
@@ -7,6 +8,7 @@ import {
   CalendarRange, 
   Plus, 
   Trash2, 
+  Pencil,
   Check, 
   Sparkles,
   Clock,
@@ -29,6 +31,7 @@ export const SetupHubModal: React.FC = () => {
     addChild,
     deleteChild,
     addTemplate,
+    updateTemplate,
     deleteTemplate,
     applyWeeklyBlueprint,
     selectedDate
@@ -55,6 +58,66 @@ export const SetupHubModal: React.FC = () => {
   const [tplEndTime, setTplEndTime] = useState('15:30');
   const [tplLocation, setTplLocation] = useState('');
   const [tplDefaultCg, setTplDefaultCg] = useState('lucila');
+
+  // Editing Blueprint State
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editChildId, setEditChildId] = useState('izzy');
+  const [editCategory, setEditCategory] = useState<'dropoff' | 'pickup' | 'activity'>('pickup');
+  const [editDays, setEditDays] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [editStartTime, setEditStartTime] = useState('15:00');
+  const [editEndTime, setEditEndTime] = useState('15:30');
+  const [editLocation, setEditLocation] = useState('');
+  const [editDefaultCg, setEditDefaultCg] = useState('lucila');
+  const [editSyncCurrentWeek, setEditSyncCurrentWeek] = useState(true);
+
+  const startEditingTemplate = (tpl: EventTemplate) => {
+    setEditingTemplateId(tpl.id);
+    setEditTitle(tpl.title);
+    setEditChildId(tpl.childId);
+    setEditCategory(tpl.category as any || 'pickup');
+    setEditDays([...tpl.daysOfWeek]);
+    setEditStartTime(tpl.startTime);
+    setEditEndTime(tpl.endTime);
+    setEditLocation(tpl.location);
+    setEditDefaultCg(tpl.defaultCaregiverId);
+    setEditSyncCurrentWeek(true);
+  };
+
+  const cancelEditingTemplate = () => {
+    setEditingTemplateId(null);
+  };
+
+  const handleToggleEditDay = (dayNum: number) => {
+    setEditDays((prev) => 
+      prev.includes(dayNum) ? prev.filter((d) => d !== dayNum) : [...prev, dayNum].sort()
+    );
+  };
+
+  const handleSaveEditedTemplate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTemplateId || !editTitle.trim()) return;
+    if (editDays.length === 0) {
+      alert('Please select at least one repeating day of the week.');
+      return;
+    }
+
+    await updateTemplate(
+      editingTemplateId,
+      {
+        title: editTitle.trim(),
+        childId: editChildId,
+        category: editCategory,
+        daysOfWeek: editDays,
+        startTime: editStartTime,
+        endTime: editEndTime,
+        location: editLocation.trim() || 'School',
+        defaultCaregiverId: editDefaultCg
+      },
+      editSyncCurrentWeek
+    );
+    setEditingTemplateId(null);
+  };
 
   if (!isSetupOpen) return null;
 
@@ -410,6 +473,180 @@ export const SetupHubModal: React.FC = () => {
                   {templates.map((tpl) => {
                     const child = childrenList.find((c) => c.id === tpl.childId);
                     const defCg = caregivers.find((c) => c.id === tpl.defaultCaregiverId);
+                    const isEditing = editingTemplateId === tpl.id;
+
+                    if (isEditing) {
+                      return (
+                        <form
+                          key={tpl.id}
+                          onSubmit={handleSaveEditedTemplate}
+                          style={{
+                            background: 'var(--surface-hover)',
+                            border: '2px solid var(--accent)',
+                            borderRadius: '10px',
+                            padding: '16px',
+                            boxShadow: 'var(--shadow-md)'
+                          }}
+                        >
+                          <div style={{ fontWeight: 800, fontSize: '0.95rem', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent)' }}>
+                              <Pencil size={16} />
+                              <span>Editing Blueprint Event: <u>{tpl.title}</u></span>
+                            </div>
+                            <button
+                              type="button"
+                              className="nav-btn"
+                              onClick={cancelEditingTemplate}
+                              title="Cancel editing"
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+                            <div>
+                              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Event Title:</label>
+                              <input 
+                                type="text" 
+                                value={editTitle}
+                                onChange={(e) => setEditTitle(e.target.value)}
+                                style={{ width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', fontWeight: 600 }}
+                                required
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Child:</label>
+                              <select
+                                value={editChildId}
+                                onChange={(e) => setEditChildId(e.target.value)}
+                                style={{ width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)' }}
+                              >
+                                {childrenList.map((ch) => (
+                                  <option key={ch.id} value={ch.id}>{ch.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Category:</label>
+                              <select
+                                value={editCategory}
+                                onChange={(e) => setEditCategory(e.target.value as any)}
+                                style={{ width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)' }}
+                              >
+                                <option value="dropoff">School Drop Off</option>
+                                <option value="pickup">School Pick Up</option>
+                                <option value="activity">Activity / Class</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          {/* Repeating Days */}
+                          <div style={{ marginBottom: '12px' }}>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Repeating Days:</label>
+                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                              {dayLabels.map((d) => {
+                                const isSelected = editDays.includes(d.num);
+                                return (
+                                  <button
+                                    type="button"
+                                    key={d.num}
+                                    onClick={() => handleToggleEditDay(d.num)}
+                                    style={{
+                                      padding: '5px 12px',
+                                      borderRadius: '6px',
+                                      fontSize: '0.8rem',
+                                      fontWeight: 700,
+                                      cursor: 'pointer',
+                                      border: '1px solid',
+                                      borderColor: isSelected ? 'var(--accent)' : 'var(--border)',
+                                      background: isSelected ? 'var(--accent)' : 'var(--surface)',
+                                      color: isSelected ? '#fff' : 'var(--text-muted)'
+                                    }}
+                                  >
+                                    {d.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Time, Location, Default Caregiver */}
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.5fr 1.5fr', gap: '10px', marginBottom: '14px' }}>
+                            <div>
+                              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Start Time:</label>
+                              <input 
+                                type="time" 
+                                value={editStartTime}
+                                onChange={(e) => setEditStartTime(e.target.value)}
+                                style={{ width: '100%', padding: '8px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)' }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>End Time:</label>
+                              <input 
+                                type="time" 
+                                value={editEndTime}
+                                onChange={(e) => setEditEndTime(e.target.value)}
+                                style={{ width: '100%', padding: '8px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)' }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Location:</label>
+                              <input 
+                                type="text" 
+                                value={editLocation}
+                                onChange={(e) => setEditLocation(e.target.value)}
+                                style={{ width: '100%', padding: '8px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)' }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Default Caregiver:</label>
+                              <select
+                                value={editDefaultCg}
+                                onChange={(e) => setEditDefaultCg(e.target.value)}
+                                style={{ width: '100%', padding: '8px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)' }}
+                              >
+                                {caregivers.map((cg) => (
+                                  <option key={cg.id} value={cg.id}>{cg.name} ({cg.role})</option>
+                                ))}
+                                <option value="unassigned">⚠️ Unassigned (Open Gap)</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          {/* Sync Checkbox & Save/Cancel Buttons */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: 'var(--text)', cursor: 'pointer' }}>
+                              <input 
+                                type="checkbox" 
+                                checked={editSyncCurrentWeek} 
+                                onChange={(e) => setEditSyncCurrentWeek(e.target.checked)}
+                              />
+                              <span>Update matching events on this week's active schedule</span>
+                            </label>
+
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <button 
+                                type="button" 
+                                className="btn" 
+                                onClick={cancelEditingTemplate}
+                                style={{ padding: '6px 14px', fontSize: '0.85rem' }}
+                              >
+                                Cancel
+                              </button>
+                              <button 
+                                type="submit" 
+                                className="btn btn-primary" 
+                                style={{ padding: '6px 16px', fontSize: '0.85rem', fontWeight: 700 }}
+                              >
+                                <Check size={15} />
+                                <span>Save Changes</span>
+                              </button>
+                            </div>
+                          </div>
+                        </form>
+                      );
+                    }
 
                     return (
                       <div 
@@ -470,14 +707,27 @@ export const SetupHubModal: React.FC = () => {
                           ))}
                         </div>
 
-                        <button 
-                          className="nav-btn"
-                          onClick={() => deleteTemplate(tpl.id)}
-                          title="Remove template"
-                          style={{ color: 'var(--danger)' }}
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        {/* Edit & Delete Action Buttons */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <button 
+                            type="button"
+                            className="nav-btn"
+                            onClick={() => startEditingTemplate(tpl)}
+                            title="Edit blueprint event"
+                            style={{ color: 'var(--primary)', padding: '6px' }}
+                          >
+                            <Pencil size={16} />
+                          </button>
+                          <button 
+                            type="button"
+                            className="nav-btn"
+                            onClick={() => deleteTemplate(tpl.id)}
+                            title="Remove template"
+                            style={{ color: 'var(--danger)', padding: '6px' }}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
