@@ -4,6 +4,7 @@ import { DispatchEvent } from '../types/schedule';
 import { HolidayModal } from './HolidayModal';
 import { format, parseISO } from 'date-fns';
 import { getHolidayForDate } from '../utils/holidayEngine';
+import { getTodayDateStr } from '../utils/dateUtils';
 import { 
   Filter, 
   Sparkles, 
@@ -219,7 +220,7 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
         <div className="calendar-grid-header">
           <div className="time-axis-header">GMT-4</div>
           {weekDays.map((d) => {
-            const isToday = d.dateStr === '2026-09-01';
+            const isToday = d.dateStr === getTodayDateStr();
             const dayHoliday = holidays.find((h) => h.date === d.dateStr);
             const knownHoliday = getHolidayForDate(d.dateStr);
 

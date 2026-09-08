@@ -17,7 +17,7 @@ import {
   DEFAULT_WEEK_EVENTS 
 } from './defaultSeed';
 import { GoogleCalendarService, GCalUserCalendar } from '../services/googleCalendarClient';
-import { isTodayOrUpcoming } from '../utils/dateUtils';
+import { isTodayOrUpcoming, getTodayDateStr } from '../utils/dateUtils';
 import { 
   saveSharedBlueprints, 
   saveSharedCaregivers, 
@@ -131,7 +131,7 @@ interface ScheduleContextType {
 const ScheduleContext = createContext<ScheduleContextType | undefined>(undefined);
 
 export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [selectedDate, setSelectedDate] = useState<string>('2026-09-01');
+  const [selectedDate, setSelectedDate] = useState<string>(() => getTodayDateStr());
   const [viewMode, setViewMode] = useState<'calendar' | 'daily' | 'weekly'>('calendar');
   const [caregivers, setCaregivers] = useState<Caregiver[]>(DEFAULT_CAREGIVERS);
   const [childrenList, setChildrenList] = useState<Child[]>(DEFAULT_CHILDREN);
@@ -145,7 +145,52 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } catch (e) {}
     return DEFAULT_TEMPLATES;
   });
-  const [events, setEvents] = useState<DispatchEvent[]>(DEFAULT_WEEK_EVENTS);
+  const [events, setEvents] = useState<DispatchEvent[]>(() => {
+    const todayStr = getTodayDateStr();
+    const monday = startOfWeek(parseISO(todayStr), { weekStartsOn: 1 });
+    const mondayStr = format(monday, 'yyyy-MM-dd');
+
+    const initialEvents = [...DEFAULT_WEEK_EVENTS];
+    const hasCurrentWeekEvents = initialEvents.some((e) => {
+      try {
+        const d = parseISO(e.date);
+        return format(startOfWeek(d, { weekStartsOn: 1 }), 'yyyy-MM-dd') === mondayStr;
+      } catch {
+        return false;
+      }
+    });
+
+    if (!hasCurrentWeekEvents) {
+      const currentWeekGenerated: DispatchEvent[] = [];
+      for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+        const currentDay = addDays(monday, dayOffset);
+        const dayOfWeek = currentDay.getDay() === 0 ? 7 : currentDay.getDay();
+        const dateStr = format(currentDay, 'yyyy-MM-dd');
+
+        const matchingTemplates = DEFAULT_TEMPLATES.filter((t) => t.daysOfWeek.includes(dayOfWeek));
+        for (const tpl of matchingTemplates) {
+          currentWeekGenerated.push({
+            id: `evt-${dateStr}-${tpl.id}`,
+            title: tpl.title,
+            childId: tpl.childId,
+            assignedTo: tpl.defaultCaregiverId,
+            date: dateStr,
+            startTime: tpl.startTime,
+            endTime: tpl.endTime,
+            location: tpl.location,
+            category: tpl.category,
+            isRecurringMaster: true,
+            masterSeriesId: tpl.id,
+            notes: tpl.notes,
+            status: tpl.defaultCaregiverId === 'unassigned' ? 'unassigned' : 'confirmed'
+          });
+        }
+      }
+      return [...initialEvents, ...currentWeekGenerated];
+    }
+
+    return initialEvents;
+  });
   const [holidays, setHolidays] = useState<DayHoliday[]>([]);
 
   // Coverage Gaps: derived from events and filtered to ONLY today or upcoming unassigned events
@@ -263,7 +308,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [isSetupOpen, setIsSetupOpen] = useState<boolean>(false);
   const [isSundayAlertOpen, setIsSundayAlertOpen] = useState<boolean>(false);
   const [isAddEventOpen, setIsAddEventOpen] = useState<boolean>(false);
-  const [addEventInitialDate, setAddEventInitialDate] = useState<string>('2026-09-01');
+  const [addEventInitialDate, setAddEventInitialDate] = useState<string>(() => getTodayDateStr());
   const [activeSetupTab, setActiveSetupTab] = useState<'caregivers' | 'kids' | 'blueprint'>('caregivers');
 
   // Staged Sync State ("Safe Mode")

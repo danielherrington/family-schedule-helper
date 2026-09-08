@@ -14,6 +14,7 @@ import {
   FileText
 } from 'lucide-react';
 import { CaregiverId, EventCategory } from '../types/schedule';
+import { getTodayDateStr } from '../utils/dateUtils';
 
 export const AddEventModal: React.FC = () => {
   const { 
@@ -28,7 +29,7 @@ export const AddEventModal: React.FC = () => {
   const [title, setTitle] = useState('');
   const [childId, setChildId] = useState('izzy');
   const [category, setCategory] = useState<EventCategory>('pickup');
-  const [date, setDate] = useState(addEventInitialDate || '2026-09-01');
+  const [date, setDate] = useState(addEventInitialDate || getTodayDateStr());
   const [startTime, setStartTime] = useState('15:00');
   const [endTime, setEndTime] = useState('15:30');
   const [location, setLocation] = useState('Lehrman School');
@@ -40,7 +41,7 @@ export const AddEventModal: React.FC = () => {
 
   useEffect(() => {
     if (isAddEventOpen) {
-      setDate(addEventInitialDate || '2026-09-01');
+      setDate(addEventInitialDate || getTodayDateStr());
     }
   }, [isAddEventOpen, addEventInitialDate]);
 

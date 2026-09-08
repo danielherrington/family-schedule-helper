@@ -17,9 +17,12 @@ import {
   CloudUpload
 } from 'lucide-react';
 
+import { isTodayOrUpcoming, getTodayDateStr } from '../utils/dateUtils';
+
 export const Header: React.FC = () => {
   const { 
     selectedDate, 
+    setSelectedDate,
     viewMode, 
     setViewMode, 
     changeDateByDays, 
@@ -224,6 +227,22 @@ export const Header: React.FC = () => {
               title={viewMode === 'daily' ? "Next Day" : "Next Week"}
             >
               <ChevronRight size={18} />
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setSelectedDate(getTodayDateStr())}
+              style={{
+                padding: '3px 9px',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                borderRadius: '6px',
+                marginLeft: '4px',
+                lineHeight: 1.2
+              }}
+              title="Return to Today"
+            >
+              Today
             </button>
           </div>
         </div>
