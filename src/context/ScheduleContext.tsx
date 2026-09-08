@@ -17,6 +17,12 @@ import {
   DEFAULT_WEEK_EVENTS 
 } from './defaultSeed';
 import { GoogleCalendarService, GCalUserCalendar } from '../services/googleCalendarClient';
+import { 
+  saveSharedBlueprints, 
+  saveSharedCaregivers, 
+  saveSharedKids, 
+  subscribeToSharedFamilySetup 
+} from '../services/firebaseClient';
 
 interface Toast {
   id: string;
@@ -58,6 +64,7 @@ interface ScheduleContextType {
   userCalendars: import('../services/googleCalendarClient').GCalUserCalendar[];
   activeCalendarId: string;
   connectedEmail: string | null;
+  cloudSyncActive: boolean;
   
   // Actions
   setSelectedDate: (date: string) => void;
@@ -153,6 +160,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [userCalendars, setUserCalendars] = useState<GCalUserCalendar[]>([]);
   const [activeCalendarId, setActiveCalendarIdState] = useState<string>(GoogleCalendarService.getActiveCalendarId());
   const [connectedEmail, setConnectedEmail] = useState<string | null>(GoogleCalendarService.getConnectedEmail());
+  const [cloudSyncActive, setCloudSyncActive] = useState<boolean>(true);
   const [reassignModalEvent, setReassignModalEvent] = useState<DispatchEvent | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isAuditLogOpen, setIsAuditLogOpen] = useState<boolean>(false);
@@ -398,6 +406,35 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   useEffect(() => {
     fetchData();
+
+    // Subscribe to shared Cloud Firestore so blueprints and caregivers sync across all devices
+    const unsubscribe = subscribeToSharedFamilySetup((data) => {
+      setCloudSyncActive(true);
+      if (data.blueprints && Array.isArray(data.blueprints) && data.blueprints.length > 0) {
+        setTemplates(data.blueprints);
+        try {
+          localStorage.setItem('gcal_blueprints_v2', JSON.stringify(data.blueprints));
+        } catch {}
+      } else if (!data.blueprints || data.blueprints.length === 0) {
+        saveSharedBlueprints(DEFAULT_TEMPLATES);
+      }
+
+      if (data.caregivers && Array.isArray(data.caregivers) && data.caregivers.length > 0) {
+        setCaregivers(data.caregivers);
+      } else if (!data.caregivers || data.caregivers.length === 0) {
+        saveSharedCaregivers(DEFAULT_CAREGIVERS);
+      }
+
+      if (data.children && Array.isArray(data.children) && data.children.length > 0) {
+        setChildrenList(data.children);
+      } else if (!data.children || data.children.length === 0) {
+        saveSharedKids(DEFAULT_CHILDREN);
+      }
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -671,6 +708,9 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setTemplates(DEFAULT_TEMPLATES);
     setPendingSyncQueue([]);
     setHolidays([]);
+    saveSharedBlueprints(DEFAULT_TEMPLATES);
+    saveSharedCaregivers(DEFAULT_CAREGIVERS);
+    saveSharedKids(DEFAULT_CHILDREN);
     addToast('Reset schedule and blueprint to default family seed (alternating drop-offs).', 'info');
     try {
       await fetch('/api/schedule/reset', { method: 'POST' });
@@ -697,7 +737,11 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       avatarInitials: initials || 'CG'
     };
 
-    setCaregivers((prev) => [...prev, newCaregiver]);
+    setCaregivers((prev) => {
+      const next = [...prev, newCaregiver];
+      saveSharedCaregivers(next);
+      return next;
+    });
     addToast(`Added Caregiver "${newCaregiver.name}"`, 'success');
 
     try {
@@ -710,7 +754,11 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const deleteCaregiver = async (id: string) => {
-    setCaregivers((prev) => prev.filter((c) => c.id !== id));
+    setCaregivers((prev) => {
+      const next = prev.filter((c) => c.id !== id);
+      saveSharedCaregivers(next);
+      return next;
+    });
     addToast('Caregiver removed.', 'info');
     try {
       await fetch(`/api/caregivers/${id}`, { method: 'DELETE' });
@@ -730,7 +778,11 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       school: data.school || 'School'
     };
 
-    setChildrenList((prev) => [...prev, newChild]);
+    setChildrenList((prev) => {
+      const next = [...prev, newChild];
+      saveSharedKids(next);
+      return next;
+    });
     addToast(`Added Child "${newChild.name}"`, 'success');
 
     try {
@@ -743,7 +795,11 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const deleteChild = async (id: string) => {
-    setChildrenList((prev) => prev.filter((c) => c.id !== id));
+    setChildrenList((prev) => {
+      const next = prev.filter((c) => c.id !== id);
+      saveSharedKids(next);
+      return next;
+    });
     addToast('Child profile removed.', 'info');
     try {
       await fetch(`/api/children/${id}`, { method: 'DELETE' });
@@ -767,6 +823,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setTemplates((prev) => {
       const next = [...prev, newTemplate];
       try { localStorage.setItem('gcal_blueprints_v2', JSON.stringify(next)); } catch (e) {}
+      saveSharedBlueprints(next);
       return next;
     });
     addToast(`Added Routine Template "${newTemplate.title}"`, 'success');
@@ -788,6 +845,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setTemplates((prev) => {
       const next = prev.map((t) => (t.id === id ? { ...t, ...updates } : t));
       try { localStorage.setItem('gcal_blueprints_v2', JSON.stringify(next)); } catch (e) {}
+      saveSharedBlueprints(next);
       return next;
     });
 
@@ -828,6 +886,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setTemplates((prev) => {
       const next = prev.filter((t) => t.id !== id);
       try { localStorage.setItem('gcal_blueprints_v2', JSON.stringify(next)); } catch (e) {}
+      saveSharedBlueprints(next);
       return next;
     });
     addToast('Template removed from blueprint.', 'info');
@@ -868,7 +927,12 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         notes: data.notes
       };
 
-      setTemplates((prev) => [...prev, newTemplate]);
+      setTemplates((prev) => {
+        const next = [...prev, newTemplate];
+        try { localStorage.setItem('gcal_blueprints_v2', JSON.stringify(next)); } catch (e) {}
+        saveSharedBlueprints(next);
+        return next;
+      });
 
       // Generate for the current week of the given date
       const baseDate = new Date(data.date + 'T12:00:00');
@@ -1156,6 +1220,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         activeCalendarId,
         setActiveCalendarId,
         connectedEmail,
+        cloudSyncActive,
         connectGoogleCalendar,
         disconnectGoogleCalendar,
         refreshCalendarEvents,

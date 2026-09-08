@@ -37,7 +37,8 @@ export const SetupHubModal: React.FC = () => {
     applyWeeklyBlueprint,
     resetToDemoSchedule,
     currentWeekDays,
-    selectedDate
+    selectedDate,
+    cloudSyncActive
   } = useSchedule();
 
   // Caregiver Form State
@@ -190,7 +191,25 @@ export const SetupHubModal: React.FC = () => {
         {/* Header */}
         <div className="modal-header">
           <div>
-            <div className="modal-title">Family Logistics Setup Hub</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div className="modal-title">Family Logistics Setup Hub</div>
+              {cloudSyncActive && (
+                <span style={{ 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: '4px', 
+                  fontSize: '0.72rem', 
+                  fontWeight: 700, 
+                  padding: '2px 8px', 
+                  borderRadius: '12px', 
+                  background: 'rgba(16, 185, 129, 0.12)', 
+                  color: '#10b981', 
+                  border: '1px solid rgba(16, 185, 129, 0.3)' 
+                }}>
+                  ☁️ Shared Cloud (Firestore)
+                </span>
+              )}
+            </div>
             <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
               Configure your Potential Caregivers, Potential Kids, and Weekly Routine Blueprint
             </div>
