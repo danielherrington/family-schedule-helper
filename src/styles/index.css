@@ -932,6 +932,7 @@ button, input, select {
   border: 1px solid var(--border);
   border-radius: 18px;
   width: 100%;
+  max-width: 600px;
   max-height: calc(100vh - 32px);
   max-height: 90dvh;
   display: flex;
@@ -968,6 +969,82 @@ button, input, select {
   overflow-y: auto;
   flex: 1;
   -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Caregiver Selection Option Grid (Used in QuickAssignModal and AddEventModal) */
+.caregiver-option-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.caregiver-option-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--surface-card);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.caregiver-option-card:hover {
+  border-color: var(--accent);
+  background: var(--surface-hover);
+  transform: translateY(-1px);
+}
+
+.caregiver-option-card.selected {
+  border-color: var(--accent);
+  background: rgba(255, 94, 126, 0.08);
+  box-shadow: 0 2px 8px rgba(255, 94, 126, 0.15);
+}
+
+/* Setup Hub Tab Buttons */
+.setup-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.setup-tab-btn:hover {
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.setup-tab-btn.active {
+  color: var(--accent);
+  border-bottom: 2px solid var(--accent);
+  font-weight: 800;
+  background: rgba(255, 94, 126, 0.04);
+}
+
+/* Generic Avatar Styles */
+.avatar {
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  font-weight: 800;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-sm);
 }
 
 .modal-footer {
