@@ -6,7 +6,7 @@ export const DEFAULT_CAREGIVERS: Caregiver[] = [
     name: 'Daniel',
     role: 'Parent / Manager',
     avatarColor: '#008B8B', // Ocean Teal
-    calendarId: 'family_daniel@herrington.ai',
+    calendarId: 'Family - Daniel',
     isManager: true,
     avatarInitials: 'DH'
   },
@@ -15,7 +15,7 @@ export const DEFAULT_CAREGIVERS: Caregiver[] = [
     name: 'Lucila',
     role: 'Parent / Manager',
     avatarColor: '#FF5E7E', // Miami Flamingo Coral
-    calendarId: 'family_lucila@herrington.ai',
+    calendarId: 'Family - Lucila',
     isManager: true,
     avatarInitials: 'LU'
   },
@@ -24,7 +24,7 @@ export const DEFAULT_CAREGIVERS: Caregiver[] = [
     name: 'Elizabeth',
     role: 'Caregiver',
     avatarColor: '#00B4D8', // Biscayne Cyan
-    calendarId: 'family_elizabeth@herrington.ai',
+    calendarId: 'Family - Elizabeth',
     isManager: false,
     avatarInitials: 'EH'
   },
@@ -33,7 +33,7 @@ export const DEFAULT_CAREGIVERS: Caregiver[] = [
     name: 'Matilda (Abu)',
     role: 'Caregiver / Grandmother',
     avatarColor: '#FF9F1C', // Sunset Gold
-    calendarId: 'family_matilda@herrington.ai',
+    calendarId: 'Family - Matilde',
     isManager: false,
     avatarInitials: 'MA'
   }
