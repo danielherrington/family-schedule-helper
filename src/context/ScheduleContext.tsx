@@ -116,8 +116,10 @@ interface ScheduleContextType {
 
   // Setup CRUD
   addCaregiver: (data: Partial<Caregiver>) => Promise<void>;
+  updateCaregiver: (id: string, updates: Partial<Caregiver>) => Promise<void>;
   deleteCaregiver: (id: string) => Promise<void>;
   addChild: (data: Partial<Child>) => Promise<void>;
+  updateChild: (id: string, updates: Partial<Child>) => Promise<void>;
   deleteChild: (id: string) => Promise<void>;
   addTemplate: (data: Partial<EventTemplate>) => Promise<void>;
   updateTemplate: (id: string, updates: Partial<EventTemplate>, updateCurrentWeekEvents?: boolean) => Promise<void>;
@@ -905,6 +907,39 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } catch (err) {}
   };
 
+  const updateCaregiver = async (id: string, updates: Partial<Caregiver>) => {
+    setCaregivers((prev) => {
+      const next = prev.map((cg) => {
+        if (cg.id === id) {
+          const name = updates.name !== undefined ? updates.name : cg.name;
+          const initials = name
+            .split(' ')
+            .map((w: string) => w[0])
+            .join('')
+            .toUpperCase()
+            .substring(0, 2);
+          return {
+            ...cg,
+            ...updates,
+            name,
+            avatarInitials: updates.avatarInitials || (updates.name ? initials : cg.avatarInitials)
+          };
+        }
+        return cg;
+      });
+      saveSharedCaregivers(next);
+      return next;
+    });
+    addToast('Caregiver updated.', 'success');
+    try {
+      await fetch(`/api/caregivers/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+    } catch (err) {}
+  };
+
   const deleteCaregiver = async (id: string) => {
     setCaregivers((prev) => {
       const next = prev.filter((c) => c.id !== id);
@@ -925,8 +960,8 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       id,
       name: data.name || 'New Child',
       color: childColor,
-      badgeBg: 'rgba(236, 72, 153, 0.15)',
-      badgeBorder: 'rgba(236, 72, 153, 0.4)',
+      badgeBg: `${childColor}20`,
+      badgeBorder: `${childColor}55`,
       school: data.school || 'School'
     };
 
@@ -942,6 +977,35 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
+      });
+    } catch (err) {}
+  };
+
+  const updateChild = async (id: string, updates: Partial<Child>) => {
+    setChildrenList((prev) => {
+      const next = prev.map((c) => {
+        if (c.id === id) {
+          const color = updates.color || c.color;
+          return {
+            ...c,
+            ...updates,
+            color,
+            badgeBg: updates.color ? `${color}20` : c.badgeBg,
+            badgeBorder: updates.color ? `${color}55` : c.badgeBorder
+          };
+        }
+        return c;
+      });
+      saveSharedKids(next);
+      return next;
+    });
+    addToast('Child details updated.', 'success');
+
+    try {
+      await fetch(`/api/children/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
       });
     } catch (err) {}
   };
@@ -1395,8 +1459,10 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         deletePermanently,
         deleteSingleEvent,
         addCaregiver,
+        updateCaregiver,
         deleteCaregiver,
         addChild,
+        updateChild,
         deleteChild,
         addTemplate,
         updateTemplate,
