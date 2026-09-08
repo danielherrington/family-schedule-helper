@@ -30,10 +30,18 @@ export interface FamilySetupDoc {
   updatedBy?: string;
 }
 
-const FAMILY_DOC_REF = doc(db, 'family', 'setup');
+export const isStaging = typeof window !== 'undefined' && (
+  window.location.hostname.includes('staging') ||
+  window.location.hostname.includes('localhost') ||
+  window.location.hostname === '127.0.0.1'
+);
+
+export const DOC_NAME = isStaging ? 'setup_staging' : 'setup';
+const FAMILY_DOC_REF = doc(db, 'family', DOC_NAME);
+const PROD_DOC_REF = doc(db, 'family', 'setup');
 
 /**
- * Saves blueprints to shared Cloud Firestore so all family members share the same routine
+ * Saves blueprints to shared Cloud Firestore
  */
 export async function saveSharedBlueprints(blueprints: EventTemplate[]): Promise<void> {
   try {
@@ -107,7 +115,8 @@ export async function saveSharedCalendarMappings(
 }
 
 /**
- * One-time fetch of family setup from Cloud Firestore
+ * One-time fetch of family setup from Cloud Firestore.
+ * If in staging and no staging document exists yet, auto-initializes with a copy of prod setup.
  */
 export async function fetchSharedFamilySetup(): Promise<FamilySetupDoc | null> {
   try {
@@ -115,10 +124,49 @@ export async function fetchSharedFamilySetup(): Promise<FamilySetupDoc | null> {
     if (snap.exists()) {
       return snap.data() as FamilySetupDoc;
     }
+    
+    // Auto-seed staging from prod on first staging load
+    if (isStaging) {
+      const prodSnap = await getDoc(PROD_DOC_REF);
+      if (prodSnap.exists()) {
+        const prodData = prodSnap.data() as FamilySetupDoc;
+        await setDoc(FAMILY_DOC_REF, {
+          ...prodData,
+          updatedAt: new Date().toISOString(),
+          updatedBy: 'Auto-seeded from Production'
+        });
+        return prodData;
+      }
+    }
     return null;
   } catch (err) {
     console.warn('Firestore fetchSharedFamilySetup error:', err);
     return null;
+  }
+}
+
+/**
+ * Copies latest production setup to staging setup in Cloud Firestore
+ */
+export async function copyProdSetupToStaging(): Promise<boolean> {
+  try {
+    const snap = await getDoc(PROD_DOC_REF);
+    if (snap.exists()) {
+      const prodData = snap.data() as FamilySetupDoc;
+      await setDoc(
+        doc(db, 'family', 'setup_staging'),
+        {
+          ...prodData,
+          updatedAt: new Date().toISOString(),
+          updatedBy: 'Copied from Production'
+        }
+      );
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.warn('Error copying prod setup to staging:', err);
+    return false;
   }
 }
 

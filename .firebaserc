@@ -1,5 +1,18 @@
 {
   "projects": {
     "default": "family-schedule-helper"
-  }
+  },
+  "targets": {
+    "family-schedule-helper": {
+      "hosting": {
+        "prod": [
+          "family-schedule-helper"
+        ],
+        "staging": [
+          "family-schedule-helper-staging"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

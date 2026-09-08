@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 
 import { isTodayOrUpcoming, getTodayDateStr } from '../utils/dateUtils';
+import { isStaging } from '../services/firebaseClient';
 
 export const Header: React.FC = () => {
   const { 
@@ -77,6 +78,31 @@ export const Header: React.FC = () => {
               <div className="brand-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span>Los Herringtons</span>
                 <span className="brand-badge">🌴 Miami</span>
+                {isStaging && (
+                  <a
+                    href="https://family-schedule-helper.web.app"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      textDecoration: 'none',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '3px',
+                      fontSize: '0.65rem',
+                      fontWeight: 800,
+                      padding: '2px 7px',
+                      borderRadius: '6px',
+                      background: '#fef3c7',
+                      color: '#b45309',
+                      border: '1px solid #f59e0b',
+                      letterSpacing: '0.04em',
+                      textTransform: 'uppercase'
+                    }}
+                    title="You are viewing the STAGING environment. Click to open Production."
+                  >
+                    🧪 Staging
+                  </a>
+                )}
               </div>
               <div className="brand-subtitle">Family Logistics & Dispatch</div>
             </div>

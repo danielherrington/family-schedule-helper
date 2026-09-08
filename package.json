@@ -8,6 +8,9 @@
     "dev:client": "vite",
     "dev:server": "tsx watch server/index.ts",
     "build": "tsc && vite build && tsc -p server/tsconfig.json",
+    "deploy": "npm run deploy:staging",
+    "deploy:staging": "npm run build && npx -y firebase-tools deploy --only hosting:staging",
+    "deploy:prod": "npm run build && npx -y firebase-tools deploy --only hosting:prod",
     "start": "node dist/server/index.js",
     "preview": "vite preview"
   },

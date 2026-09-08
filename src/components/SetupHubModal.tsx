@@ -18,6 +18,7 @@ import {
   RotateCcw,
   SlidersHorizontal
 } from 'lucide-react';
+import { isStaging, copyProdSetupToStaging } from '../services/firebaseClient';
 
 export const SetupHubModal: React.FC = () => {
   const { 
@@ -268,11 +269,11 @@ export const SetupHubModal: React.FC = () => {
                     fontWeight: 700, 
                     padding: '3px 9px', 
                     borderRadius: '12px', 
-                    background: 'rgba(16, 185, 129, 0.12)', 
-                    color: '#059669', 
-                    border: '1px solid rgba(16, 185, 129, 0.3)' 
+                    background: isStaging ? '#fef3c7' : 'rgba(16, 185, 129, 0.12)', 
+                    color: isStaging ? '#b45309' : '#059669', 
+                    border: isStaging ? '1px solid #f59e0b' : '1px solid rgba(16, 185, 129, 0.3)' 
                   }}>
-                    ☁️ Shared Cloud (Firestore)
+                    {isStaging ? '🧪 Staging Cloud (Firestore)' : '☁️ Shared Cloud (Firestore)'}
                   </span>
                 )}
               </div>
@@ -799,6 +800,27 @@ export const SetupHubModal: React.FC = () => {
                   💡 <strong>Event Blueprint</strong> is your master weekly routine (e.g. *"Vale Drop Off Mon–Fri"*, *"Izzy Gymnastics Tue/Thu"*).
                 </div>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {isStaging && (
+                    <button 
+                      type="button"
+                      className="btn btn-secondary" 
+                      onClick={async () => {
+                        if (confirm('Copy latest production routine blueprint and settings into this staging environment? This will overwrite your staging test data with current prod.')) {
+                          const ok = await copyProdSetupToStaging();
+                          if (ok) {
+                            window.location.reload();
+                          } else {
+                            alert('Failed to copy from production. Please try again.');
+                          }
+                        }
+                      }}
+                      style={{ whiteSpace: 'nowrap', fontSize: '0.82rem', borderColor: '#f59e0b', color: '#b45309' }}
+                      title="Sync latest setup from production to staging"
+                    >
+                      <RotateCcw size={14} />
+                      <span>Sync from Prod</span>
+                    </button>
+                  )}
                   <button 
                     type="button"
                     className="btn btn-secondary" 
