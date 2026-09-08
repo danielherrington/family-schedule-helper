@@ -486,12 +486,11 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           mondayStr,
           sundayStr,
           caregivers,
-          childrenList
+          childrenList,
+          templates
         );
 
-        if (parsedEvents.length > 0) {
-          setEvents(parsedEvents);
-        }
+        setEvents(parsedEvents);
       }
     } catch (err: any) {
       console.warn('Google Calendar fetch warning:', err);

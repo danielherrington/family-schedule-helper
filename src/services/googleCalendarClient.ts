@@ -4,7 +4,7 @@
  * Enables live Google Calendar read/write without requiring a dedicated backend server.
  */
 
-import { DispatchEvent, Caregiver, Child } from '../types/schedule';
+import { DispatchEvent, Caregiver, Child, EventTemplate } from '../types/schedule';
 
 declare const google: any;
 
@@ -181,19 +181,129 @@ export class GoogleCalendarService {
   }
 
   /**
+   * Checks if a Google Calendar event matches our kid logistics blueprints.
+   * Only events that match a configured blueprint or are explicit helper events will be accepted.
+   */
+  public static matchesBlueprint(
+    summary: string,
+    description: string = '',
+    templates: EventTemplate[] = [],
+    childrenList: Child[] = []
+  ): { matches: boolean; matchedTemplate?: EventTemplate; childId?: string; category?: 'dropoff' | 'pickup' | 'activity' | 'routine' } {
+    if (!summary) return { matches: false };
+
+    const lowerSummary = summary.toLowerCase();
+    const lowerDesc = (description || '').toLowerCase();
+
+    // 1. Explicit helper tag check: created or updated by this helper
+    if (
+      lowerDesc.includes('schedule helper') || 
+      lowerDesc.includes('[child logistics]') || 
+      lowerDesc.includes('assigned driver:')
+    ) {
+      return { matches: true };
+    }
+
+    // 2. Strip bracketed driver tags and parenthetical tags from summary
+    // e.g. "[Daniel] Vale School Drop Off" -> "Vale School Drop Off"
+    const cleaned = summary
+      .replace(/\[.*?\]/g, '')
+      .replace(/\(.*?\)/g, '')
+      .replace(/\s+/g, ' ')
+      .toLowerCase()
+      .trim();
+
+    if (!cleaned) return { matches: false };
+
+    // 3. Match against configured blueprint templates
+    for (const tpl of templates) {
+      const tplTitle = tpl.title.toLowerCase().trim();
+
+      // Direct exact or substring match with template title
+      if (cleaned === tplTitle || lowerSummary.includes(tplTitle) || (cleaned.length >= 5 && tplTitle.includes(cleaned))) {
+        return { 
+          matches: true, 
+          matchedTemplate: tpl, 
+          childId: tpl.childId,
+          category: tpl.category
+        };
+      }
+
+      // Check child name associated with template
+      const child = childrenList.find((c) => c.id === tpl.childId);
+      const childName = (child?.name || tpl.childId).toLowerCase();
+
+      const mentionsChild = lowerSummary.includes(childName) || lowerDesc.includes(childName);
+
+      if (mentionsChild) {
+        // Dropoff match
+        if (tpl.category === 'dropoff' && (lowerSummary.includes('drop') || lowerSummary.includes('dropoff') || lowerSummary.includes('drop-off'))) {
+          return { matches: true, matchedTemplate: tpl, childId: tpl.childId, category: 'dropoff' };
+        }
+        // Pickup match
+        if (tpl.category === 'pickup' && (lowerSummary.includes('pick') || lowerSummary.includes('pickup') || lowerSummary.includes('pick-up') || lowerSummary.includes('abu'))) {
+          return { matches: true, matchedTemplate: tpl, childId: tpl.childId, category: 'pickup' };
+        }
+
+        // Activity / custom keyword match from template title
+        const tplWords = tplTitle
+          .split(/[\s-]+/)
+          .map((w) => w.replace(/[^a-z0-9]/g, ''))
+          .filter((w) => w.length >= 3 && !['school', 'pick', 'drop', 'off', 'with', 'the', 'for', childName].includes(w));
+
+        for (const w of tplWords) {
+          if (lowerSummary.includes(w) || lowerDesc.includes(w)) {
+            return { matches: true, matchedTemplate: tpl, childId: tpl.childId, category: tpl.category };
+          }
+        }
+      } else {
+        // Distinct activity name match without explicit child name in title (e.g. "Ballet", "Gymnastics", "Chess")
+        const uniqueActivityWords = tplTitle
+          .split(/[\s-]+/)
+          .map((w) => w.replace(/[^a-z0-9]/g, ''))
+          .filter((w) => ['ballet', 'gymnastics', 'chess', 'karate', 'soccer', 'swimming', 'dance', 'piano', 'martial'].includes(w));
+
+        for (const w of uniqueActivityWords) {
+          if (lowerSummary.includes(w) || lowerDesc.includes(w)) {
+            return { matches: true, matchedTemplate: tpl, childId: tpl.childId, category: tpl.category };
+          }
+        }
+      }
+    }
+
+    return { matches: false };
+  }
+
+  /**
    * Converts a Google Calendar API event item into our typed DispatchEvent
+   * Strictly filters to ONLY events that match configured kid logistics blueprints.
    */
   public static parseGCalEvent(
     gcalEvent: any,
     caregivers: Caregiver[],
     childrenList: Child[],
     overrideCaregiverId?: string,
-    sourceCalendarId?: string
+    sourceCalendarId?: string,
+    templates?: EventTemplate[]
   ): DispatchEvent | null {
     if (!gcalEvent || !gcalEvent.id) return null;
 
     const summary = (gcalEvent.summary || '').trim();
     if (!summary) return null;
+
+    // Filter to ONLY events that match kid logistics blueprints!
+    let matchedChildId: string | undefined;
+    let matchedCategory: 'dropoff' | 'pickup' | 'activity' | 'routine' | undefined;
+
+    if (templates && templates.length > 0) {
+      const matchResult = this.matchesBlueprint(summary, gcalEvent.description, templates, childrenList);
+      if (!matchResult.matches) {
+        // Unrelated event on family calendar (e.g. doctor, meeting, flight, dinner) -> ignore completely!
+        return null;
+      }
+      matchedChildId = matchResult.childId;
+      matchedCategory = matchResult.category;
+    }
 
     // Determine event date and times
     let dateStr = '';
@@ -218,24 +328,28 @@ export class GoogleCalendarService {
     if (!dateStr) return null;
 
     // Detect Child
-    let childId = 'izzy';
+    let childId = matchedChildId || 'izzy';
     const lowerSummary = summary.toLowerCase();
     const lowerDesc = (gcalEvent.description || '').toLowerCase();
     
-    if (lowerSummary.includes('vale') || lowerDesc.includes('vale')) {
-      childId = 'vale';
-    } else if (lowerSummary.includes('izzy') || lowerDesc.includes('izzy')) {
-      childId = 'izzy';
+    if (!matchedChildId) {
+      if (lowerSummary.includes('vale') || lowerDesc.includes('vale')) {
+        childId = 'vale';
+      } else if (lowerSummary.includes('izzy') || lowerDesc.includes('izzy')) {
+        childId = 'izzy';
+      }
     }
 
     // Detect Category
-    let category: 'dropoff' | 'pickup' | 'activity' | 'routine' = 'pickup';
-    if (lowerSummary.includes('drop') || lowerSummary.includes('dropoff') || lowerSummary.includes('drop-off')) {
-      category = 'dropoff';
-    } else if (lowerSummary.includes('pick') || lowerSummary.includes('pickup') || lowerSummary.includes('pick-up')) {
-      category = 'pickup';
-    } else if (lowerSummary.includes('ballet') || lowerSummary.includes('gym') || lowerSummary.includes('soccer') || lowerSummary.includes('class')) {
-      category = 'activity';
+    let category: 'dropoff' | 'pickup' | 'activity' | 'routine' = matchedCategory || 'pickup';
+    if (!matchedCategory) {
+      if (lowerSummary.includes('drop') || lowerSummary.includes('dropoff') || lowerSummary.includes('drop-off')) {
+        category = 'dropoff';
+      } else if (lowerSummary.includes('pick') || lowerSummary.includes('pickup') || lowerSummary.includes('pick-up')) {
+        category = 'pickup';
+      } else if (lowerSummary.includes('ballet') || lowerSummary.includes('gym') || lowerSummary.includes('soccer') || lowerSummary.includes('class')) {
+        category = 'activity';
+      }
     }
 
     // Detect Status
@@ -555,7 +669,8 @@ export class GoogleCalendarService {
     mondayDateStr: string,
     sundayDateStr: string,
     caregivers: Caregiver[],
-    childrenList: Child[]
+    childrenList: Child[],
+    templates: EventTemplate[] = []
   ): Promise<DispatchEvent[]> {
     const token = this.getStoredToken();
     if (!token || !calendarConfigs.length) return [];
@@ -569,7 +684,8 @@ export class GoogleCalendarService {
             caregivers, 
             childrenList, 
             cfg.caregiverId, 
-            cfg.calendarId
+            cfg.calendarId,
+            templates
           );
         }).filter(Boolean) as DispatchEvent[];
       })
