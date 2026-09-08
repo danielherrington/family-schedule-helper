@@ -269,9 +269,10 @@ export class RecurrenceEngine {
    * Scans a schedule for unassigned or missing pickups and drop-offs (ignoring cancelled & no-pickup-needed)
    */
   public static detectGaps(eventsList: any[], targetDate?: string) {
+    const todayStr = new Date().toISOString().split('T')[0];
     return eventsList
       .filter((e) => {
-        const matchesDate = !targetDate || e.date === targetDate;
+        const matchesDate = targetDate ? e.date === targetDate : e.date >= todayStr;
         // Ignore cancelled & no_pickup_needed events!
         const isNotCancelled = e.status !== 'cancelled' && e.status !== 'no_pickup_needed';
         return matchesDate && isNotCancelled && (e.assignedTo === 'unassigned' || e.status === 'unassigned');

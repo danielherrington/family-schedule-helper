@@ -1,13 +1,15 @@
 import React from 'react';
 import { useSchedule } from '../context/ScheduleContext';
 import { AlertTriangle, ArrowRight } from 'lucide-react';
+import { isTodayOrUpcoming } from '../utils/dateUtils';
 
 export const GapAlertBanner: React.FC = () => {
   const { gaps, events, setReassignModalEvent, setSelectedDate, setViewMode } = useSchedule();
 
-  if (gaps.length === 0) return null;
+  const activeGaps = gaps.filter((g) => isTodayOrUpcoming(g.date));
+  if (activeGaps.length === 0) return null;
 
-  const topGap = gaps[0];
+  const topGap = activeGaps[0];
   const targetEvent = events.find((e) => e.id === topGap.eventId);
 
   const handleResolve = () => {

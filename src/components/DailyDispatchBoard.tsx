@@ -15,6 +15,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { getHolidayForDate } from '../utils/holidayEngine';
+import { isTodayOrUpcoming } from '../utils/dateUtils';
 
 export const DailyDispatchBoard: React.FC = () => {
   const { 
@@ -190,7 +191,7 @@ export const DailyDispatchBoard: React.FC = () => {
             <CheckCircle2 size={15} />
             <span><strong>{totalAssigned}</strong> Active</span>
           </span>
-          {totalUnassigned > 0 && (
+          {totalUnassigned > 0 && isTodayOrUpcoming(selectedDate) && (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--danger)', fontWeight: 700, fontSize: '0.85rem' }}>
               <AlertTriangle size={15} />
               <span><strong>{totalUnassigned}</strong> Unassigned</span>

@@ -17,6 +17,7 @@ import {
   DEFAULT_WEEK_EVENTS 
 } from './defaultSeed';
 import { GoogleCalendarService, GCalUserCalendar } from '../services/googleCalendarClient';
+import { isTodayOrUpcoming } from '../utils/dateUtils';
 import { 
   saveSharedBlueprints, 
   saveSharedCaregivers, 
@@ -146,17 +147,31 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   });
   const [events, setEvents] = useState<DispatchEvent[]>(DEFAULT_WEEK_EVENTS);
   const [holidays, setHolidays] = useState<DayHoliday[]>([]);
-  const [gaps, setGaps] = useState<ScheduleGap[]>([
-    {
-      eventId: 'evt-thu-pick-gap',
-      title: 'Abu Pick Up Vale',
-      childName: 'VALE',
-      date: '2026-09-03',
-      time: '15:15 - 15:45',
-      location: 'Lehrman School',
-      severity: 'high'
-    }
-  ]);
+
+  // Coverage Gaps: derived from events and filtered to ONLY today or upcoming unassigned events
+  const gaps = useMemo<ScheduleGap[]>(() => {
+    return events
+      .filter(
+        (e) =>
+          e.assignedTo === 'unassigned' &&
+          e.status !== 'cancelled' &&
+          e.status !== 'no_pickup_needed' &&
+          isTodayOrUpcoming(e.date)
+      )
+      .map((e) => {
+        const child = childrenList.find((c) => c.id === e.childId);
+        return {
+          eventId: e.id,
+          title: e.title,
+          childName: child ? child.name.toUpperCase() : e.childId.toUpperCase(),
+          date: e.date,
+          time: `${e.startTime} - ${e.endTime}`,
+          location: e.location || 'School',
+          severity: (e.category === 'pickup' || e.category === 'dropoff' ? 'high' : 'medium') as 'high' | 'medium'
+        };
+      })
+      .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+  }, [events, childrenList]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [authStatus, setAuthStatus] = useState<{ mode: 'demo_mode' | 'live_gcal'; isConfigured: boolean }>({
@@ -431,15 +446,6 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
         if (parsedEvents.length > 0) {
           setEvents(parsedEvents);
-          setGaps(parsedEvents.filter((e) => e.assignedTo === 'unassigned' && e.status !== 'cancelled' && e.status !== 'no_pickup_needed').map((e) => ({
-            eventId: e.id,
-            title: e.title,
-            childName: e.childId.toUpperCase(),
-            date: e.date,
-            time: `${e.startTime} - ${e.endTime}`,
-            location: e.location,
-            severity: 'high'
-          })));
         }
       }
     } catch (err: any) {
@@ -515,10 +521,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
       }
 
-      if (gapsRes && gapsRes.ok) {
-        const gapsData = await gapsRes.json();
-        if (gapsData.gaps) setGaps(gapsData.gaps);
-      }
+
     } catch (err) {
       console.warn('Backend fetch notice:', err);
     }
@@ -613,16 +616,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       'success'
     );
 
-    // Update local gaps
-    setGaps(updated.filter((e) => e.assignedTo === 'unassigned' && e.status !== 'cancelled').map((e) => ({
-      eventId: e.id,
-      title: e.title,
-      childName: e.childId.toUpperCase(),
-      date: e.date,
-      time: `${e.startTime} - ${e.endTime}`,
-      location: e.location,
-      severity: 'high'
-    })));
+
 
     if (GoogleCalendarService.isConnected()) {
       if (syncMode === 'immediate') {
@@ -698,8 +692,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setEvents(updated);
     addToast(`🌴 Marked "${targetEvent.title}" as No Class (${reason})`, 'info');
 
-    // Remove from gaps
-    setGaps((prev) => prev.filter((g) => g.eventId !== eventId));
+
 
     if (GoogleCalendarService.isConnected()) {
       if (syncMode === 'immediate') {
@@ -753,8 +746,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setEvents(updated);
     addToast(`🚫 Marked "${targetEvent.title}" as No Pickup Needed (${reason})`, 'info');
 
-    // Remove from gaps so no false alarms are triggered
-    setGaps((prev) => prev.filter((g) => g.eventId !== eventId));
+
 
     if (GoogleCalendarService.isConnected()) {
       if (syncMode === 'immediate') {
@@ -836,8 +828,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     setEvents(updated);
     setHolidays((prev) => [...prev.filter((h) => h.date !== dateStr), { date: dateStr, name: holidayName, childId }]);
-    // Remove gaps for this day
-    setGaps((prev) => prev.filter((g) => g.date !== dateStr));
+
 
     addToast(`🌴 Marked ${dateStr} as "${holidayName}" (${cancelledCount} duties cancelled)`, 'success');
 
@@ -1272,9 +1263,6 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       )
     );
 
-    // Clear from gaps
-    setGaps((prev) => prev.filter((g) => g.eventId !== eventId));
-
     addToast(`🗑️ Permanently removed "${title}" from weekly schedule & blueprint`, 'info');
 
     const deleteCalId = targetEvent?.sourceCalendarId || activeCalendarId;
@@ -1314,7 +1302,6 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const targetEvent = events.find((e) => e.id === eventId);
     const deleteCalId = targetEvent?.sourceCalendarId || activeCalendarId;
     setEvents((prev) => prev.filter((e) => e.id !== eventId));
-    setGaps((prev) => prev.filter((g) => g.eventId !== eventId));
 
     addToast(`Removed "${targetEvent?.title || 'Event'}" from ${targetEvent?.date || 'schedule'}`, 'info');
 

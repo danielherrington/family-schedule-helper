@@ -4,6 +4,7 @@ import { EventCard } from './EventCard';
 import { HolidayModal } from './HolidayModal';
 import { Calendar, Filter, Sparkles, CheckCircle2, AlertCircle, Palmtree } from 'lucide-react';
 import { format } from 'date-fns';
+import { isTodayOrUpcoming } from '../utils/dateUtils';
 
 export const WeeklyMatrixView: React.FC = () => {
   const { events, currentWeekDays, setSelectedDate, setViewMode, applyWeeklyBlueprint, children: childrenList, holidays } = useSchedule();
@@ -103,7 +104,7 @@ export const WeeklyMatrixView: React.FC = () => {
                     <Palmtree size={16} />
                   </button>
 
-                  {unassignedCount > 0 ? (
+                  {unassignedCount > 0 && isTodayOrUpcoming(d.dateStr) ? (
                     <span className="count-badge" style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', borderColor: '#ef4444' }}>
                       ⚠️ {unassignedCount} Gap
                     </span>

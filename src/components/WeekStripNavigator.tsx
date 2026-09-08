@@ -3,6 +3,7 @@ import { useSchedule } from '../context/ScheduleContext';
 import { format } from 'date-fns';
 import { getHolidayForDate } from '../utils/holidayEngine';
 import { ChevronLeft, ChevronRight, Palmtree, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { isTodayOrUpcoming } from '../utils/dateUtils';
 
 export const WeekStripNavigator: React.FC = () => {
   const { selectedDate, setSelectedDate, currentWeekDays, events, holidays, changeDateByDays } = useSchedule();
@@ -28,7 +29,7 @@ export const WeekStripNavigator: React.FC = () => {
         {weekDays.map((d) => {
           const isSelected = selectedDate === d.fullDate;
           const dayEvents = events.filter((e) => e.date === d.fullDate);
-          const hasGap = dayEvents.some((e) => e.assignedTo === 'unassigned' && e.status !== 'cancelled');
+          const hasGap = isTodayOrUpcoming(d.fullDate) && dayEvents.some((e) => e.assignedTo === 'unassigned' && e.status !== 'cancelled');
           const isMarkedHoliday = holidays.some((h) => h.date === d.fullDate) || (dayEvents.length > 0 && dayEvents.every((e) => e.status === 'cancelled'));
           const knownHoliday = getHolidayForDate(d.fullDate);
           const activeCount = dayEvents.filter((e) => e.status !== 'cancelled').length;
