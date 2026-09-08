@@ -248,7 +248,7 @@ export const SetupHubModal: React.FC = () => {
 
   return (
     <div className="modal-overlay" onClick={() => setIsSetupOpen(false)}>
-      <div className="modal-card" style={{ maxWidth: '820px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
+      <div className="modal-card setup-hub-modal" onClick={(e) => e.stopPropagation()}>
         
         {/* Header */}
         <div className="modal-header" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '14px', padding: '18px 22px 14px' }}>
@@ -293,7 +293,7 @@ export const SetupHubModal: React.FC = () => {
               onClick={() => setActiveSetupTab('caregivers')}
             >
               <Users size={16} />
-              <span>1. Potential Caregivers</span>
+              <span><span className="hide-mobile">1. Potential </span>Caregivers</span>
               <span className="setup-tab-count">{caregivers.length}</span>
             </button>
             <button
@@ -302,7 +302,7 @@ export const SetupHubModal: React.FC = () => {
               onClick={() => setActiveSetupTab('kids')}
             >
               <Smile size={16} />
-              <span>2. Potential Kids</span>
+              <span><span className="hide-mobile">2. Potential </span>Kids</span>
               <span className="setup-tab-count">{childrenList.length}</span>
             </button>
             <button
@@ -311,14 +311,14 @@ export const SetupHubModal: React.FC = () => {
               onClick={() => setActiveSetupTab('blueprint')}
             >
               <CalendarRange size={16} />
-              <span>3. Event Blueprint</span>
+              <span><span className="hide-mobile">3. Event </span>Blueprints</span>
               <span className="setup-tab-count">{templates.length}</span>
             </button>
           </div>
         </div>
 
         {/* Body Content */}
-        <div className="modal-body" style={{ overflowY: 'auto', flex: 1, padding: '20px' }}>
+        <div className="modal-body">
           
           {/* TAB 1: CAREGIVERS */}
           {activeSetupTab === 'caregivers' && (
@@ -1021,11 +1021,12 @@ export const SetupHubModal: React.FC = () => {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          padding: '12px 16px',
+                          padding: '12px 14px',
                           background: 'var(--surface-card)',
                           border: '1px solid var(--border)',
                           borderRadius: '10px',
-                          gap: '12px'
+                          gap: '10px',
+                          flexWrap: 'wrap'
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
