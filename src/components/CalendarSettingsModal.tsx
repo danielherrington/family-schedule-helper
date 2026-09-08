@@ -23,6 +23,9 @@ export const CalendarSettingsModal: React.FC = () => {
     activeCalendarId,
     setActiveCalendarId,
     connectedEmail,
+    caregiverCalendarMappings,
+    setCaregiverCalendarMapping,
+    autoDetectCalendarMappings,
     connectGoogleCalendar,
     disconnectGoogleCalendar,
     refreshCalendarEvents,
@@ -83,32 +86,21 @@ export const CalendarSettingsModal: React.FC = () => {
                   Connected as: <strong style={{ color: 'var(--primary)' }}>{connectedEmail || 'Authenticated User'}</strong>
                 </div>
 
-                {/* Active Calendar Picker */}
                 {userCalendars.length > 0 && (
-                  <div style={{ marginBottom: '14px' }}>
-                    <label style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', display: 'block' }}>
-                      Syncing with Google Calendar:
-                    </label>
-                    <select
-                      value={activeCalendarId}
-                      onChange={(e) => setActiveCalendarId(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        borderRadius: '8px',
-                        border: '1px solid var(--border)',
-                        background: 'var(--surface)',
-                        color: 'var(--text)',
-                        fontSize: '0.9rem',
-                        fontWeight: 600
-                      }}
+                  <div style={{ marginBottom: '14px', padding: '10px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ fontSize: '0.85rem' }}>
+                      <strong>{userCalendars.length}</strong> Google Calendars discovered in your account.
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => autoDetectCalendarMappings()}
+                      style={{ fontSize: '0.78rem', padding: '4px 10px', gap: '5px' }}
+                      title="Auto-detect calendars for Daniel, Lucila, Elizabeth, Matilda, and Shared"
                     >
-                      {userCalendars.map((cal) => (
-                        <option key={cal.id} value={cal.id}>
-                          {cal.summary} {cal.primary ? '(Primary)' : ''}
-                        </option>
-                      ))}
-                    </select>
+                      <Sparkles size={13} color="var(--primary)" />
+                      <span>Auto-Detect Mappings</span>
+                    </button>
                   </div>
                 )}
 
@@ -249,43 +241,153 @@ export const CalendarSettingsModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Caregiver Calendar Mappings */}
+          {/* Caregiver Calendar Routing */}
           <div>
-            <div style={{ fontSize: '0.88rem', fontWeight: 800, marginBottom: '6px' }}>
-              Caregiver Calendar / Email Mappings:
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <div>
+                <div style={{ fontSize: '0.92rem', fontWeight: 800 }}>Per-Caregiver Google Calendar Routing:</div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  Each family member has their own Google Calendar. Reassigning a duty moves the event directly to their calendar.
+                </div>
+              </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {caregivers.map((cg) => (
-                <div 
-                  key={cg.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '8px 12px',
-                    background: 'var(--surface-card)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                    fontSize: '0.82rem'
-                  }}
-                >
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {caregivers.map((cg) => {
+                const mapped = caregiverCalendarMappings[cg.id];
+                return (
+                  <div 
+                    key={cg.id}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                      padding: '10px 14px',
+                      background: 'var(--surface-card)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '8px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div className="avatar" style={{ backgroundColor: cg.avatarColor, width: '28px', height: '28px', fontSize: '0.75rem' }}>
+                          {cg.avatarInitials}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>
+                            {cg.name} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>({cg.role})</span>
+                          </div>
+                        </div>
+                      </div>
+                      {mapped?.calendarId ? (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 700 }}>
+                          <CheckCircle2 size={13} />
+                          <span>Routing to: {mapped.calendarName}</span>
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '0.72rem', color: 'var(--accent-secondary)', fontWeight: 600 }}>
+                          No Calendar Selected
+                        </span>
+                      )}
+                    </div>
+
+                    {userCalendars.length > 0 ? (
+                      <select
+                        value={mapped?.calendarId || ''}
+                        onChange={(e) => {
+                          const cal = userCalendars.find((c) => c.id === e.target.value);
+                          setCaregiverCalendarMapping(cg.id, e.target.value, cal?.summary || e.target.value);
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '7px 10px',
+                          borderRadius: '6px',
+                          border: '1px solid var(--border)',
+                          background: 'var(--surface)',
+                          color: 'var(--text)',
+                          fontSize: '0.85rem',
+                          fontWeight: 600
+                        }}
+                      >
+                        <option value="">-- Select Dedicated Google Calendar for {cg.name} --</option>
+                        {userCalendars.map((cal) => (
+                          <option key={cal.id} value={cal.id}>
+                            {cal.summary} {cal.primary ? '(Primary)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                        Connect your Google account above to select from your live Google Calendars.
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Shared / Unassigned Calendar */}
+              <div 
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  padding: '10px 14px',
+                  background: 'var(--surface-card)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div className="avatar" style={{ backgroundColor: cg.avatarColor, width: '28px', height: '28px', fontSize: '0.75rem' }}>
-                      {cg.avatarInitials}
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem' }}>
+                      🏠
                     </div>
                     <div>
-                      <div style={{ fontWeight: 700 }}>{cg.name} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>({cg.role})</span></div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                        {cg.calendarId}
+                      <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>
+                        Shared / Unassigned Calendar <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>(General Routine)</span>
                       </div>
                     </div>
                   </div>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
-                    <CheckCircle2 size={13} />
-                    <span>Mapped</span>
-                  </span>
+                  {caregiverCalendarMappings['shared']?.calendarId ? (
+                    <span style={{ fontSize: '0.75rem', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 700 }}>
+                      <CheckCircle2 size={13} />
+                      <span>Routing to: {caregiverCalendarMappings['shared'].calendarName}</span>
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      Defaulting to {activeCalendarId === 'primary' ? 'Primary' : 'Active'}
+                    </span>
+                  )}
                 </div>
-              ))}
+
+                {userCalendars.length > 0 && (
+                  <select
+                    value={caregiverCalendarMappings['shared']?.calendarId || activeCalendarId || ''}
+                    onChange={(e) => {
+                      const cal = userCalendars.find((c) => c.id === e.target.value);
+                      setActiveCalendarId(e.target.value);
+                      setCaregiverCalendarMapping('shared', e.target.value, cal?.summary || e.target.value);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '7px 10px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--surface)',
+                      color: 'var(--text)',
+                      fontSize: '0.85rem',
+                      fontWeight: 600
+                    }}
+                  >
+                    <option value="">-- Select Shared Family Calendar (e.g. Family - Shared) --</option>
+                    {userCalendars.map((cal) => (
+                      <option key={cal.id} value={cal.id}>
+                        {cal.summary} {cal.primary ? '(Primary)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
             </div>
           </div>
         </div>

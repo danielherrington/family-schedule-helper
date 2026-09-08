@@ -21,6 +21,7 @@ import {
   saveSharedBlueprints, 
   saveSharedCaregivers, 
   saveSharedKids, 
+  saveSharedCalendarMappings,
   subscribeToSharedFamilySetup 
 } from '../services/firebaseClient';
 
@@ -65,6 +66,9 @@ interface ScheduleContextType {
   activeCalendarId: string;
   connectedEmail: string | null;
   cloudSyncActive: boolean;
+  caregiverCalendarMappings: Record<string, { calendarId: string; calendarName: string }>;
+  setCaregiverCalendarMapping: (caregiverId: string, calendarId: string, calendarName: string) => void;
+  autoDetectCalendarMappings: (availableCals?: import('../services/googleCalendarClient').GCalUserCalendar[]) => void;
   
   // Actions
   setSelectedDate: (date: string) => void;
@@ -161,6 +165,81 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [activeCalendarId, setActiveCalendarIdState] = useState<string>(GoogleCalendarService.getActiveCalendarId());
   const [connectedEmail, setConnectedEmail] = useState<string | null>(GoogleCalendarService.getConnectedEmail());
   const [cloudSyncActive, setCloudSyncActive] = useState<boolean>(true);
+  const [caregiverCalendarMappings, setCaregiverCalendarMappings] = useState<
+    Record<string, { calendarId: string; calendarName: string }>
+  >(() => {
+    try {
+      const saved = localStorage.getItem('gcal_caregiver_calendar_map');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {};
+  });
+
+  const setCaregiverCalendarMapping = (caregiverId: string, calendarId: string, calendarName: string) => {
+    setCaregiverCalendarMappings((prev) => {
+      const next = {
+        ...prev,
+        [caregiverId]: { calendarId, calendarName }
+      };
+      try {
+        localStorage.setItem('gcal_caregiver_calendar_map', JSON.stringify(next));
+      } catch {}
+      saveSharedCalendarMappings(next);
+      return next;
+    });
+    addToast(`Mapped ${caregiverId} to calendar "${calendarName}"`, 'info');
+  };
+
+  const autoDetectCalendarMappings = (availableCals: GCalUserCalendar[] = userCalendars) => {
+    if (!availableCals || availableCals.length === 0) return;
+
+    setCaregiverCalendarMappings((prev) => {
+      const next = { ...prev };
+      let updated = false;
+
+      const danielCal = availableCals.find((c) => c.summary.toLowerCase().includes('daniel'));
+      if (danielCal && (!next['daniel'] || next['daniel'].calendarId !== danielCal.id)) {
+        next['daniel'] = { calendarId: danielCal.id, calendarName: danielCal.summary };
+        updated = true;
+      }
+
+      const lucilaCal = availableCals.find((c) => c.summary.toLowerCase().includes('lucila'));
+      if (lucilaCal && (!next['lucila'] || next['lucila'].calendarId !== lucilaCal.id)) {
+        next['lucila'] = { calendarId: lucilaCal.id, calendarName: lucilaCal.summary };
+        updated = true;
+      }
+
+      const elizabethCal = availableCals.find((c) => c.summary.toLowerCase().includes('elizabeth'));
+      if (elizabethCal && (!next['elizabeth'] || next['elizabeth'].calendarId !== elizabethCal.id)) {
+        next['elizabeth'] = { calendarId: elizabethCal.id, calendarName: elizabethCal.summary };
+        updated = true;
+      }
+
+      const matildaCal = availableCals.find((c) => 
+        c.summary.toLowerCase().includes('matild') || c.summary.toLowerCase().includes('abu')
+      );
+      if (matildaCal && (!next['matilda'] || next['matilda'].calendarId !== matildaCal.id)) {
+        next['matilda'] = { calendarId: matildaCal.id, calendarName: matildaCal.summary };
+        updated = true;
+      }
+
+      const sharedCal = availableCals.find((c) => c.summary.toLowerCase().includes('shared'));
+      if (sharedCal && (!next['shared'] || next['shared'].calendarId !== sharedCal.id)) {
+        next['shared'] = { calendarId: sharedCal.id, calendarName: sharedCal.summary };
+        updated = true;
+      }
+
+      if (updated) {
+        try {
+          localStorage.setItem('gcal_caregiver_calendar_map', JSON.stringify(next));
+        } catch {}
+        saveSharedCalendarMappings(next);
+        addToast('Auto-detected and mapped family Google Calendars!', 'success');
+      }
+      return next;
+    });
+  };
+
   const [reassignModalEvent, setReassignModalEvent] = useState<DispatchEvent | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isAuditLogOpen, setIsAuditLogOpen] = useState<boolean>(false);
@@ -234,19 +313,32 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     for (const item of pendingSyncQueue) {
       try {
         if (item.type === 'reassign') {
-          const currentEvt = events.find((e) => e.id === item.eventId) || item.payload.event;
-          const targetCg = caregivers.find((c) => c.id === item.payload.targetCaregiverId) || null;
-          await GoogleCalendarService.patchEventAssignment(activeCalendarId, item.eventId, currentEvt, targetCg);
+          const sourceCal = item.sourceCalendarId || item.payload?.sourceCalendarId || activeCalendarId;
+          const targetCal = item.targetCalendarId || item.payload?.targetCalendarId || activeCalendarId;
+
+          if (sourceCal && targetCal && sourceCal !== targetCal) {
+            const moveRes = await GoogleCalendarService.moveEvent(sourceCal, item.eventId, targetCal);
+            if (!moveRes.success) {
+              throw new Error(`Failed to move event from ${item.sourceCalendarName || sourceCal} to ${item.targetCalendarName || targetCal}`);
+            }
+          } else {
+            const currentEvt = events.find((e) => e.id === item.eventId) || item.payload.event;
+            const targetCg = caregivers.find((c) => c.id === item.payload.targetCaregiverId) || null;
+            await GoogleCalendarService.patchEventAssignment(sourceCal || activeCalendarId, item.eventId, currentEvt, targetCg);
+          }
           successCount++;
         } else if (item.type === 'no_pickup') {
+          const cal = item.sourceCalendarId || item.payload?.sourceCalendarId || activeCalendarId;
           const currentEvt = events.find((e) => e.id === item.eventId) || item.payload.event;
-          await GoogleCalendarService.patchEventNoPickup(activeCalendarId, item.eventId, currentEvt, item.payload.reason || 'No pickup needed');
+          await GoogleCalendarService.patchEventNoPickup(cal, item.eventId, currentEvt, item.payload.reason || 'No pickup needed');
           successCount++;
         } else if (item.type === 'create') {
-          await GoogleCalendarService.createEvent(activeCalendarId, item.payload.createData);
+          const targetCal = item.targetCalendarId || (item.payload?.createData?.assignedTo && caregiverCalendarMappings[item.payload.createData.assignedTo]?.calendarId) || caregiverCalendarMappings['shared']?.calendarId || activeCalendarId;
+          await GoogleCalendarService.createEvent(targetCal, item.payload.createData);
           successCount++;
         } else if (item.type === 'delete') {
-          await GoogleCalendarService.deleteEvent(activeCalendarId, item.eventId);
+          const cal = item.sourceCalendarId || item.payload?.sourceCalendarId || activeCalendarId;
+          await GoogleCalendarService.deleteEvent(cal, item.eventId);
           successCount++;
         }
       } catch (err: any) {
@@ -306,25 +398,47 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const mondayStr = format(currentWeekDays[0], 'yyyy-MM-dd');
       const sundayStr = format(currentWeekDays[6], 'yyyy-MM-dd');
       
-      const rawEvents = await GoogleCalendarService.fetchEventsForRange(activeCalendarId, mondayStr, sundayStr);
-      const parsedEvents: DispatchEvent[] = [];
+      const configs: { calendarId: string; caregiverId?: string }[] = [];
+      const seenCalIds = new Set<string>();
 
-      for (const raw of rawEvents) {
-        const parsed = GoogleCalendarService.parseGCalEvent(raw, caregivers, childrenList);
-        if (parsed) parsedEvents.push(parsed);
+      for (const cg of caregivers) {
+        const mapped = caregiverCalendarMappings[cg.id];
+        if (mapped?.calendarId && !seenCalIds.has(mapped.calendarId)) {
+          configs.push({ calendarId: mapped.calendarId, caregiverId: cg.id });
+          seenCalIds.add(mapped.calendarId);
+        }
       }
 
-      if (parsedEvents.length > 0) {
-        setEvents(parsedEvents);
-        setGaps(parsedEvents.filter((e) => e.assignedTo === 'unassigned' && e.status !== 'cancelled' && e.status !== 'no_pickup_needed').map((e) => ({
-          eventId: e.id,
-          title: e.title,
-          childName: e.childId.toUpperCase(),
-          date: e.date,
-          time: `${e.startTime} - ${e.endTime}`,
-          location: e.location,
-          severity: 'high'
-        })));
+      const sharedMapped = caregiverCalendarMappings['shared'];
+      if (sharedMapped?.calendarId && !seenCalIds.has(sharedMapped.calendarId)) {
+        configs.push({ calendarId: sharedMapped.calendarId, caregiverId: 'shared' });
+        seenCalIds.add(sharedMapped.calendarId);
+      } else if (activeCalendarId && !seenCalIds.has(activeCalendarId)) {
+        configs.push({ calendarId: activeCalendarId, caregiverId: 'shared' });
+        seenCalIds.add(activeCalendarId);
+      }
+
+      if (configs.length > 0) {
+        const parsedEvents = await GoogleCalendarService.fetchMultiCalendarEvents(
+          configs,
+          mondayStr,
+          sundayStr,
+          caregivers,
+          childrenList
+        );
+
+        if (parsedEvents.length > 0) {
+          setEvents(parsedEvents);
+          setGaps(parsedEvents.filter((e) => e.assignedTo === 'unassigned' && e.status !== 'cancelled' && e.status !== 'no_pickup_needed').map((e) => ({
+            eventId: e.id,
+            title: e.title,
+            childName: e.childId.toUpperCase(),
+            date: e.date,
+            time: `${e.startTime} - ${e.endTime}`,
+            location: e.location,
+            severity: 'high'
+          })));
+        }
       }
     } catch (err: any) {
       console.warn('Google Calendar fetch warning:', err);
@@ -340,6 +454,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       const cals = await GoogleCalendarService.listCalendars().catch(() => []);
       setUserCalendars(cals);
+      autoDetectCalendarMappings(cals);
 
       await refreshCalendarEvents();
       addToast(`✨ Live Google Calendar Connected (${email || 'Ready'})`, 'success');
@@ -361,7 +476,10 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     try {
       if (GoogleCalendarService.isConnected()) {
         const cals = await GoogleCalendarService.listCalendars().catch(() => []);
-        if (cals.length > 0) setUserCalendars(cals);
+        if (cals.length > 0) {
+          setUserCalendars(cals);
+          autoDetectCalendarMappings(cals);
+        }
         await refreshCalendarEvents();
       }
 
@@ -430,6 +548,13 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       } else if (!data.children || data.children.length === 0) {
         saveSharedKids(DEFAULT_CHILDREN);
       }
+
+      if (data.calendarMappings && Object.keys(data.calendarMappings).length > 0) {
+        setCaregiverCalendarMappings(data.calendarMappings);
+        try {
+          localStorage.setItem('gcal_caregiver_calendar_map', JSON.stringify(data.calendarMappings));
+        } catch {}
+      }
     });
 
     return () => {
@@ -441,7 +566,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (GoogleCalendarService.isConnected()) {
       refreshCalendarEvents();
     }
-  }, [selectedDate, activeCalendarId]);
+  }, [selectedDate, activeCalendarId, caregiverCalendarMappings]);
 
   const changeDateByDays = (days: number) => {
     const curr = new Date(selectedDate + 'T12:00:00');
@@ -457,11 +582,21 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const targetEvent = events.find((e) => e.id === eventId);
     if (!targetEvent) return;
 
+    const currentCgId = targetEvent.assignedTo;
+    const newCgId = targetCaregiverId;
+
+    const sourceCal = targetEvent.sourceCalendarId || caregiverCalendarMappings[currentCgId]?.calendarId || caregiverCalendarMappings['shared']?.calendarId || activeCalendarId;
+    const targetCal = caregiverCalendarMappings[newCgId]?.calendarId || caregiverCalendarMappings['shared']?.calendarId || activeCalendarId;
+
+    const sourceCalName = caregiverCalendarMappings[currentCgId]?.calendarName || (userCalendars.find(c => c.id === sourceCal)?.summary) || 'Current Calendar';
+    const targetCalName = caregiverCalendarMappings[newCgId]?.calendarName || (userCalendars.find(c => c.id === targetCal)?.summary) || 'New Calendar';
+
     const updated = events.map((e) => {
       if (e.id === eventId) {
         return {
           ...e,
           assignedTo: targetCaregiverId,
+          sourceCalendarId: targetCal,
           isException: e.isRecurringMaster || !!e.masterSeriesId,
           status: (targetCaregiverId === 'unassigned' ? 'unassigned' : 'confirmed') as 'confirmed' | 'unassigned',
           cancellationReason: undefined
@@ -472,7 +607,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     setEvents(updated);
     addToast(
-      `✓ Reassigned "${targetEvent.title}" to ${targetCaregiver ? targetCaregiver.name : 'Unassigned'}`,
+      `✓ Reassigned "${targetEvent.title}" to ${targetCaregiver ? targetCaregiver.name : 'Unassigned'} (${targetCalName})`,
       'success'
     );
 
@@ -489,8 +624,13 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     if (GoogleCalendarService.isConnected()) {
       if (syncMode === 'immediate') {
-        GoogleCalendarService.patchEventAssignment(activeCalendarId, eventId, targetEvent, targetCaregiver || null)
-          .catch((e) => console.warn('GCal patch warning:', e));
+        if (sourceCal && targetCal && sourceCal !== targetCal) {
+          GoogleCalendarService.moveEvent(sourceCal, eventId, targetCal)
+            .catch((e) => console.warn('GCal move warning:', e));
+        } else {
+          GoogleCalendarService.patchEventAssignment(sourceCal || activeCalendarId, eventId, targetEvent, targetCaregiver || null)
+            .catch((e) => console.warn('GCal patch warning:', e));
+        }
       } else {
         const staged: StagedSyncItem = {
           id: `sync-reassign-${eventId}-${Date.now()}`,
@@ -500,10 +640,22 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           childId: targetEvent.childId,
           eventDate: targetEvent.date,
           eventTime: `${targetEvent.startTime} - ${targetEvent.endTime}`,
-          summary: `Reassign Driver: ${targetEvent.title} → ${targetCaregiver ? targetCaregiver.name : 'Unassigned'}`,
-          previousValue: targetEvent.assignedTo,
-          newValue: targetCaregiverId,
-          payload: { targetCaregiverId, event: targetEvent, reason },
+          summary: `Move Event: ${targetEvent.title} (${sourceCalName} ➔ ${targetCalName})`,
+          previousValue: `${caregivers.find((c) => c.id === currentCgId)?.name || 'Unassigned'} (${sourceCalName})`,
+          newValue: `${targetCaregiver ? targetCaregiver.name : 'Unassigned'} (${targetCalName})`,
+          sourceCalendarId: sourceCal,
+          targetCalendarId: targetCal,
+          sourceCalendarName: sourceCalName,
+          targetCalendarName: targetCalName,
+          payload: { 
+            targetCaregiverId, 
+            event: targetEvent, 
+            reason,
+            sourceCalendarId: sourceCal,
+            targetCalendarId: targetCal,
+            sourceCalendarName: sourceCalName,
+            targetCalendarName: targetCalName
+          },
           timestamp: Date.now()
         };
         updatePendingQueue((prev) => [...prev.filter((p) => !(p.eventId === eventId && p.type === 'reassign')), staged]);
@@ -1061,9 +1213,10 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     addToast(`🗑️ Permanently removed "${title}" from weekly schedule & blueprint`, 'info');
 
+    const deleteCalId = targetEvent?.sourceCalendarId || activeCalendarId;
     if (GoogleCalendarService.isConnected()) {
       if (syncMode === 'immediate') {
-        GoogleCalendarService.deleteEvent(activeCalendarId, eventId)
+        GoogleCalendarService.deleteEvent(deleteCalId, eventId)
           .catch((e) => console.warn('GCal delete permanent warning:', e));
       } else {
         const staged: StagedSyncItem = {
@@ -1075,7 +1228,8 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           eventDate: targetEvent?.date || '',
           eventTime: targetEvent ? `${targetEvent.startTime} - ${targetEvent.endTime}` : '',
           summary: `Delete Event (Blueprint): ${title}`,
-          payload: {},
+          sourceCalendarId: deleteCalId,
+          payload: { sourceCalendarId: deleteCalId },
           timestamp: Date.now()
         };
         updatePendingQueue((prev) => [...prev, staged]);
@@ -1094,6 +1248,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Delete Single Event Instance
   const deleteSingleEvent = async (eventId: string) => {
     const targetEvent = events.find((e) => e.id === eventId);
+    const deleteCalId = targetEvent?.sourceCalendarId || activeCalendarId;
     setEvents((prev) => prev.filter((e) => e.id !== eventId));
     setGaps((prev) => prev.filter((g) => g.eventId !== eventId));
 
@@ -1101,7 +1256,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     if (GoogleCalendarService.isConnected()) {
       if (syncMode === 'immediate') {
-        GoogleCalendarService.deleteEvent(activeCalendarId, eventId)
+        GoogleCalendarService.deleteEvent(deleteCalId, eventId)
           .catch((e) => console.warn('GCal delete single warning:', e));
       } else {
         const staged: StagedSyncItem = {
@@ -1113,7 +1268,8 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           eventDate: targetEvent?.date || '',
           eventTime: targetEvent ? `${targetEvent.startTime} - ${targetEvent.endTime}` : '',
           summary: `Delete Event Instance: ${targetEvent?.title || 'Event'} (${targetEvent?.date || ''})`,
-          payload: {},
+          sourceCalendarId: deleteCalId,
+          payload: { sourceCalendarId: deleteCalId },
           timestamp: Date.now()
         };
         updatePendingQueue((prev) => [...prev, staged]);
@@ -1221,6 +1377,9 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setActiveCalendarId,
         connectedEmail,
         cloudSyncActive,
+        caregiverCalendarMappings,
+        setCaregiverCalendarMapping,
+        autoDetectCalendarMappings,
         connectGoogleCalendar,
         disconnectGoogleCalendar,
         refreshCalendarEvents,

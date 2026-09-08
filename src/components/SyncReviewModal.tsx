@@ -252,14 +252,24 @@ export const SyncReviewModal: React.FC = () => {
                       }}
                     >
                       {isReassign && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ color: 'var(--text-muted)' }}>
-                            {getCaregiverName(item.previousValue)}
-                          </span>
-                          <ArrowRight size={13} color="var(--text-muted)" />
-                          <span style={{ fontWeight: 800, color: 'var(--primary)' }}>
-                            {getCaregiverName(item.newValue)}
-                          </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>
+                              {getCaregiverName(item.previousValue)}
+                            </span>
+                            <ArrowRight size={13} color="var(--text-muted)" />
+                            <span style={{ fontWeight: 800, color: 'var(--primary)' }}>
+                              {getCaregiverName(item.newValue)}
+                            </span>
+                          </div>
+                          {(item.sourceCalendarName || item.targetCalendarName) && (
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                              <span>📅 Move:</span>
+                              <span style={{ fontWeight: 600, color: 'var(--text)' }}>{item.sourceCalendarName || 'Current Calendar'}</span>
+                              <ArrowRight size={10} />
+                              <span style={{ fontWeight: 700, color: 'var(--primary)' }}>{item.targetCalendarName || 'Target Calendar'}</span>
+                            </div>
+                          )}
                         </div>
                       )}
 

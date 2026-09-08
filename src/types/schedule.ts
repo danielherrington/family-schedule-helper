@@ -99,6 +99,10 @@ export interface StagedSyncItem {
   summary: string;
   previousValue?: string;
   newValue?: string;
+  sourceCalendarId?: string;
+  targetCalendarId?: string;
+  sourceCalendarName?: string;
+  targetCalendarName?: string;
   payload: any;
   timestamp: number;
 }

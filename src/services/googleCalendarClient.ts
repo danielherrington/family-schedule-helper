@@ -186,7 +186,9 @@ export class GoogleCalendarService {
   public static parseGCalEvent(
     gcalEvent: any,
     caregivers: Caregiver[],
-    childrenList: Child[]
+    childrenList: Child[],
+    overrideCaregiverId?: string,
+    sourceCalendarId?: string
   ): DispatchEvent | null {
     if (!gcalEvent || !gcalEvent.id) return null;
 
@@ -248,8 +250,10 @@ export class GoogleCalendarService {
       cancellationReason = 'Calendar Event Cancelled';
     }
 
-    // Detect Assigned Caregiver
-    let assignedTo = 'unassigned';
+    // Detect Assigned Caregiver:
+    // If the event comes from a specific caregiver's calendar (e.g. Family - Daniel),
+    // it belongs to that caregiver directly!
+    let assignedTo = (overrideCaregiverId && overrideCaregiverId !== 'shared') ? overrideCaregiverId : 'unassigned';
 
     // 1. Check title prefix tags: e.g. [Daniel], [Lucila], [Elizabeth], [Matilda], DH, LU, EH, MA
     for (const cg of caregivers) {
@@ -314,6 +318,7 @@ export class GoogleCalendarService {
       isRecurringMaster: !!gcalEvent.recurringEventId,
       masterSeriesId: gcalEvent.recurringEventId,
       notes: gcalEvent.description,
+      sourceCalendarId,
       status,
       cancellationReason
     };
@@ -458,5 +463,125 @@ export class GoogleCalendarService {
     );
 
     return res.ok || res.status === 404 || res.status === 410;
+  }
+
+  /**
+   * Moves an event from one Google Calendar to another (e.g. from Family - Daniel to Family - Lucila)
+   * Uses Google Calendar API events.move, with automatic copy & delete fallback.
+   */
+  public static async moveEvent(
+    sourceCalendarId: string,
+    eventId: string,
+    destinationCalendarId: string
+  ): Promise<{ success: boolean; newEventId?: string }> {
+    const token = this.getStoredToken();
+    if (!token) return { success: false };
+
+    if (!sourceCalendarId || !destinationCalendarId || sourceCalendarId === destinationCalendarId) {
+      return { success: true, newEventId: eventId };
+    }
+
+    try {
+      // 1. Try native Google Calendar API events.move endpoint
+      const moveUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(sourceCalendarId)}/events/${encodeURIComponent(eventId)}/move?destination=${encodeURIComponent(destinationCalendarId)}`;
+      const res = await fetch(moveUrl, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        const moved = await res.json();
+        return { success: true, newEventId: moved.id };
+      }
+
+      console.warn(`Native events.move returned ${res.status}, attempting copy & delete fallback...`);
+    } catch (e) {
+      console.warn('Native events.move failed, falling back to copy & delete:', e);
+    }
+
+    // 2. Fallback: fetch event from source, create in target, delete from source
+    try {
+      const getUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(sourceCalendarId)}/events/${encodeURIComponent(eventId)}`;
+      const getRes = await fetch(getUrl, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!getRes.ok) {
+        throw new Error(`Failed to fetch source event (${getRes.status})`);
+      }
+
+      const originalEvent = await getRes.json();
+      const payload: any = {
+        summary: originalEvent.summary,
+        description: originalEvent.description,
+        location: originalEvent.location,
+        start: originalEvent.start,
+        end: originalEvent.end
+      };
+
+      const createRes = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(destinationCalendarId)}/events`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        }
+      );
+
+      if (!createRes.ok) {
+        throw new Error(`Failed to recreate event in target calendar (${createRes.status})`);
+      }
+
+      const created = await createRes.json();
+
+      // Cleanly delete from source calendar
+      await this.deleteEvent(sourceCalendarId, eventId);
+
+      return { success: true, newEventId: created.id };
+    } catch (err) {
+      console.error('Cross-calendar fallback move failed:', err);
+      return { success: false };
+    }
+  }
+
+  /**
+   * Fetches and aggregates events across multiple family Google Calendars concurrently
+   */
+  public static async fetchMultiCalendarEvents(
+    calendarConfigs: { calendarId: string; caregiverId?: string }[],
+    mondayDateStr: string,
+    sundayDateStr: string,
+    caregivers: Caregiver[],
+    childrenList: Child[]
+  ): Promise<DispatchEvent[]> {
+    const token = this.getStoredToken();
+    if (!token || !calendarConfigs.length) return [];
+
+    const results = await Promise.allSettled(
+      calendarConfigs.map(async (cfg) => {
+        const rawItems = await this.fetchEventsForRange(cfg.calendarId, mondayDateStr, sundayDateStr);
+        return rawItems.map((raw) => {
+          return this.parseGCalEvent(
+            raw, 
+            caregivers, 
+            childrenList, 
+            cfg.caregiverId, 
+            cfg.calendarId
+          );
+        }).filter(Boolean) as DispatchEvent[];
+      })
+    );
+
+    const allEvents: DispatchEvent[] = [];
+    for (const res of results) {
+      if (res.status === 'fulfilled') {
+        allEvents.push(...res.value);
+      }
+    }
+
+    return allEvents;
   }
 }

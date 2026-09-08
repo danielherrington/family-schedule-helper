@@ -25,6 +25,7 @@ export interface FamilySetupDoc {
   blueprints?: EventTemplate[];
   caregivers?: Caregiver[];
   children?: Child[];
+  calendarMappings?: Record<string, { calendarId: string; calendarName: string }>;
   updatedAt?: string;
   updatedBy?: string;
 }
@@ -82,6 +83,26 @@ export async function saveSharedKids(children: Child[]): Promise<void> {
     );
   } catch (err) {
     console.warn('Firestore saveSharedKids error:', err);
+  }
+}
+
+/**
+ * Saves caregiver Google Calendar mappings to shared Cloud Firestore
+ */
+export async function saveSharedCalendarMappings(
+  calendarMappings: Record<string, { calendarId: string; calendarName: string }>
+): Promise<void> {
+  try {
+    await setDoc(
+      FAMILY_DOC_REF,
+      {
+        calendarMappings,
+        updatedAt: new Date().toISOString()
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    console.warn('Firestore saveSharedCalendarMappings error:', err);
   }
 }
 
