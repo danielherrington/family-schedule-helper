@@ -15,7 +15,8 @@ import {
   MapPin,
   HelpCircle,
   Play,
-  RotateCcw
+  RotateCcw,
+  SlidersHorizontal
 } from 'lucide-react';
 
 export const SetupHubModal: React.FC = () => {
@@ -247,62 +248,73 @@ export const SetupHubModal: React.FC = () => {
 
   return (
     <div className="modal-overlay" onClick={() => setIsSetupOpen(false)}>
-      <div className="modal-card" style={{ maxWidth: '780px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
+      <div className="modal-card" style={{ maxWidth: '820px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
         
         {/* Header */}
-        <div className="modal-header">
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div className="modal-title">Family Logistics Setup Hub</div>
-              {cloudSyncActive && (
-                <span style={{ 
-                  display: 'inline-flex', 
-                  alignItems: 'center', 
-                  gap: '4px', 
-                  fontSize: '0.72rem', 
-                  fontWeight: 700, 
-                  padding: '2px 8px', 
-                  borderRadius: '12px', 
-                  background: 'rgba(16, 185, 129, 0.12)', 
-                  color: '#10b981', 
-                  border: '1px solid rgba(16, 185, 129, 0.3)' 
-                }}>
-                  ☁️ Shared Cloud (Firestore)
-                </span>
-              )}
+        <div className="modal-header" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '14px', padding: '18px 22px 14px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <SlidersHorizontal size={20} color="var(--accent)" />
+                  <span>Family Logistics Setup Hub</span>
+                </div>
+                {cloudSyncActive && (
+                  <span style={{ 
+                    display: 'inline-flex', 
+                    alignItems: 'center', 
+                    gap: '4px', 
+                    fontSize: '0.72rem', 
+                    fontWeight: 700, 
+                    padding: '3px 9px', 
+                    borderRadius: '12px', 
+                    background: 'rgba(16, 185, 129, 0.12)', 
+                    color: '#059669', 
+                    border: '1px solid rgba(16, 185, 129, 0.3)' 
+                  }}>
+                    ☁️ Shared Cloud (Firestore)
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: '0.825rem', color: 'var(--text-muted)', marginTop: '3px' }}>
+                Configure your Potential Caregivers, Potential Kids, and Weekly Routine Blueprint
+              </div>
             </div>
-            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-              Configure your Potential Caregivers, Potential Kids, and Weekly Routine Blueprint
-            </div>
+            <button className="nav-btn" onClick={() => setIsSetupOpen(false)} title="Close">
+              <X size={20} />
+            </button>
           </div>
-          <button className="nav-btn" onClick={() => setIsSetupOpen(false)}>
-            <X size={20} />
-          </button>
-        </div>
 
-        {/* Tab Switcher */}
-        <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', background: 'var(--surface-card)', padding: '4px 16px 0 16px', gap: '8px' }}>
-          <button
-            className={`setup-tab-btn ${activeSetupTab === 'caregivers' ? 'active' : ''}`}
-            onClick={() => setActiveSetupTab('caregivers')}
-          >
-            <Users size={16} />
-            <span>1. Potential Caregivers ({caregivers.length})</span>
-          </button>
-          <button
-            className={`setup-tab-btn ${activeSetupTab === 'kids' ? 'active' : ''}`}
-            onClick={() => setActiveSetupTab('kids')}
-          >
-            <Smile size={16} />
-            <span>2. Potential Kids ({childrenList.length})</span>
-          </button>
-          <button
-            className={`setup-tab-btn ${activeSetupTab === 'blueprint' ? 'active' : ''}`}
-            onClick={() => setActiveSetupTab('blueprint')}
-          >
-            <CalendarRange size={16} />
-            <span>3. Event Blueprint ({templates.length})</span>
-          </button>
+          {/* Segmented Pill Tab Switcher */}
+          <div className="setup-tab-bar">
+            <button
+              type="button"
+              className={`setup-tab-btn ${activeSetupTab === 'caregivers' ? 'active' : ''}`}
+              onClick={() => setActiveSetupTab('caregivers')}
+            >
+              <Users size={16} />
+              <span>1. Potential Caregivers</span>
+              <span className="setup-tab-count">{caregivers.length}</span>
+            </button>
+            <button
+              type="button"
+              className={`setup-tab-btn ${activeSetupTab === 'kids' ? 'active' : ''}`}
+              onClick={() => setActiveSetupTab('kids')}
+            >
+              <Smile size={16} />
+              <span>2. Potential Kids</span>
+              <span className="setup-tab-count">{childrenList.length}</span>
+            </button>
+            <button
+              type="button"
+              className={`setup-tab-btn ${activeSetupTab === 'blueprint' ? 'active' : ''}`}
+              onClick={() => setActiveSetupTab('blueprint')}
+            >
+              <CalendarRange size={16} />
+              <span>3. Event Blueprint</span>
+              <span className="setup-tab-count">{templates.length}</span>
+            </button>
+          </div>
         </div>
 
         {/* Body Content */}
