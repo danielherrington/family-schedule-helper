@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="miamiGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF5E7E" />
+      <stop offset="50%" stop-color="#FFB703" />
+      <stop offset="100%" stop-color="#00B4D8" />
+    </linearGradient>
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FF5E7E" />
+      <stop offset="100%" stop-color="#FF758F" />
+    </linearGradient>
+  </defs>
+
+  <!-- Squircle Background with Miami Sunset Gradient -->
+  <rect width="512" height="512" rx="120" fill="url(#miamiGrad)" />
+
+  <!-- Inner calendar drop shadow -->
+  <rect x="86" y="118" width="340" height="310" rx="44" fill="#000000" opacity="0.15" />
+
+  <!-- Calendar Base Plate -->
+  <rect x="86" y="110" width="340" height="310" rx="44" fill="#FFFFFF" />
+
+  <!-- Calendar Top Red/Coral Header Bar -->
+  <path d="M86 154 C86 129.7 105.7 110 130 110 L382 110 C406.3 110 426 129.7 426 154 L426 195 L86 195 Z" fill="url(#headerGrad)" />
+
+  <!-- Binder Rings -->
+  <rect x="150" y="65" width="36" height="75" rx="18" fill="#FFFFFF" stroke="rgba(0,0,0,0.08)" stroke-width="4" />
+  <rect x="326" y="65" width="36" height="75" rx="18" fill="#FFFFFF" stroke="rgba(0,0,0,0.08)" stroke-width="4" />
+
+  <!-- Event Chips in Calendar Grid -->
+  <!-- Row 1: Drop-off (Amber) and Pickup (Blue) -->
+  <rect x="124" y="235" width="115" height="42" rx="12" fill="#FFB703" />
+  <rect x="273" y="235" width="115" height="42" rx="12" fill="#00B4D8" />
+
+  <!-- Row 2: Activity (Purple) and Confirmed Checkmark (Green) -->
+  <rect x="124" y="305" width="115" height="42" rx="12" fill="#A855F7" />
+  <g transform="translate(273, 305)">
+    <rect width="115" height="42" rx="12" fill="#10B981" />
+    <!-- Checkmark Icon inside green badge -->
+    <path d="M44 21 L53 29 L71 13" fill="none" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" />
+  </g>
+</svg>

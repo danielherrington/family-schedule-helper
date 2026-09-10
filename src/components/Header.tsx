@@ -145,7 +145,7 @@ export const Header: React.FC = () => {
             <button 
               className="btn"
               onClick={() => setIsSetupOpen(true)}
-              title="Manage Potential Caregivers, Potential Kids, and Weekly Blueprint"
+              title="Manage Potential Caregivers, Potential Kids & Pets, and Weekly Blueprint"
               style={{ fontWeight: 700 }}
             >
               <Users size={16} />

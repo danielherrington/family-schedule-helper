@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { getHolidayForDate } from '../utils/holidayEngine';
 import { isTodayOrUpcoming } from '../utils/dateUtils';
+import { getEventShift } from '../utils/shiftUtils';
 
 export const DailyDispatchBoard: React.FC = () => {
   const { 
@@ -59,9 +60,9 @@ export const DailyDispatchBoard: React.FC = () => {
   });
 
   // Group events into 3 Family Shifts
-  const morningRuns = dayEvents.filter((e) => e.startTime < '12:00');
-  const middayPickups = dayEvents.filter((e) => e.startTime >= '12:00' && e.startTime <= '15:30');
-  const afternoonActivities = dayEvents.filter((e) => e.startTime > '15:30');
+  const morningRuns = dayEvents.filter((e) => getEventShift(e) === 'dropoff');
+  const middayPickups = dayEvents.filter((e) => getEventShift(e) === 'pickup');
+  const afternoonActivities = dayEvents.filter((e) => getEventShift(e) === 'activity');
 
   const totalAssigned = dayEvents.filter((e) => e.assignedTo !== 'unassigned' && e.status !== 'cancelled' && e.status !== 'no_pickup_needed').length;
   const totalUnassigned = dayEvents.filter((e) => e.assignedTo === 'unassigned' && e.status !== 'cancelled' && e.status !== 'no_pickup_needed').length;
@@ -239,9 +240,9 @@ export const DailyDispatchBoard: React.FC = () => {
               <div className="shift-group-header">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Sunrise size={18} color="#f59e0b" />
-                  <span className="shift-title">Morning School Runs (7:30 AM – 9:00 AM)</span>
+                  <span className="shift-title">Morning Runs & Routines (7:00 AM – 9:00 AM)</span>
                 </div>
-                <span className="count-badge">{morningRuns.length} drop-offs</span>
+                <span className="count-badge">{morningRuns.length} {morningRuns.length === 1 ? 'duty' : 'duties'}</span>
               </div>
               <div className="shift-card-grid">
                 {morningRuns.map((evt) => (
@@ -259,7 +260,7 @@ export const DailyDispatchBoard: React.FC = () => {
                   <Sun size={18} color="#3b82f6" />
                   <span className="shift-title">School Dismissals & Pickups (1:00 PM – 3:30 PM)</span>
                 </div>
-                <span className="count-badge">{middayPickups.length} pickups</span>
+                <span className="count-badge">{middayPickups.length} {middayPickups.length === 1 ? 'pickup' : 'pickups'}</span>
               </div>
               <div className="shift-card-grid">
                 {middayPickups.map((evt) => (
@@ -269,15 +270,15 @@ export const DailyDispatchBoard: React.FC = () => {
             </div>
           )}
 
-          {/* SHIFT 3: AFTER-SCHOOL ACTIVITIES */}
+          {/* SHIFT 3: AFTER-SCHOOL ACTIVITIES & EVENING */}
           {afternoonActivities.length > 0 && (
             <div className="shift-group-container">
               <div className="shift-group-header">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Moon size={18} color="#a855f7" />
-                  <span className="shift-title">After-School Classes & Activities (4:00 PM – 6:30 PM)</span>
+                  <span className="shift-title">Classes, Activities & Evening Routines (4:00 PM – 7:30 PM)</span>
                 </div>
-                <span className="count-badge">{afternoonActivities.length} activities</span>
+                <span className="count-badge">{afternoonActivities.length} {afternoonActivities.length === 1 ? 'duty' : 'duties'}</span>
               </div>
               <div className="shift-card-grid">
                 {afternoonActivities.map((evt) => (

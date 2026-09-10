@@ -140,7 +140,16 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const saved = localStorage.getItem('gcal_blueprints_v2');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const hasMoe = parsed.some((t: EventTemplate) => t.childId === 'moe' || t.title.toLowerCase().includes('moe'));
+          if (!hasMoe) {
+            const moeTemplates = DEFAULT_TEMPLATES.filter((t) => t.childId === 'moe');
+            const merged = [...parsed, ...moeTemplates];
+            try { localStorage.setItem('gcal_blueprints_v2', JSON.stringify(merged)); } catch {}
+            return merged;
+          }
+          return parsed;
+        }
       }
     } catch (e) {}
     return DEFAULT_TEMPLATES;
@@ -149,6 +158,68 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const todayStr = getTodayDateStr();
     const monday = startOfWeek(parseISO(todayStr), { weekStartsOn: 1 });
     const mondayStr = format(monday, 'yyyy-MM-dd');
+
+    // 1. Check if cached events exist in localStorage
+    try {
+      const savedEvents = localStorage.getItem('gcal_cached_events_v2');
+      if (savedEvents) {
+        const parsed = JSON.parse(savedEvents);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const hasMoe = parsed.some((e: DispatchEvent) => e.childId === 'moe');
+          if (!hasMoe) {
+            const moeEvents: DispatchEvent[] = [];
+            for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+              const currentDay = addDays(monday, dayOffset);
+              const dateStr = format(currentDay, 'yyyy-MM-dd');
+              moeEvents.push(
+                {
+                  id: `evt-${dateStr}-tpl-moe-morning-walk`,
+                  title: 'Walk Moe 🐕 (Morning)',
+                  childId: 'moe',
+                  assignedTo: 'daniel',
+                  date: dateStr,
+                  startTime: '07:15',
+                  endTime: '07:45',
+                  location: 'Neighborhood Walk',
+                  category: 'routine',
+                  isRecurringMaster: true,
+                  masterSeriesId: 'tpl-moe-morning-walk',
+                  status: 'confirmed'
+                },
+                {
+                  id: `evt-${dateStr}-tpl-moe-evening-walk`,
+                  title: 'Walk Moe 🐕 (Evening)',
+                  childId: 'moe',
+                  assignedTo: 'elizabeth',
+                  date: dateStr,
+                  startTime: '18:30',
+                  endTime: '19:00',
+                  location: 'Neighborhood Walk',
+                  category: 'routine',
+                  isRecurringMaster: true,
+                  masterSeriesId: 'tpl-moe-evening-walk',
+                  status: 'confirmed'
+                }
+              );
+            }
+            const merged = [...parsed, ...moeEvents];
+            try { localStorage.setItem('gcal_cached_events_v2', JSON.stringify(merged)); } catch {}
+            return merged;
+          }
+          return parsed;
+        }
+      }
+    } catch {}
+
+    // 2. Get active blueprints (from localStorage or DEFAULT_TEMPLATES)
+    let activeTemplates = DEFAULT_TEMPLATES;
+    try {
+      const saved = localStorage.getItem('gcal_blueprints_v2');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) activeTemplates = parsed;
+      }
+    } catch {}
 
     const initialEvents = [...DEFAULT_WEEK_EVENTS];
     const hasCurrentWeekEvents = initialEvents.some((e) => {
@@ -167,7 +238,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         const dayOfWeek = currentDay.getDay() === 0 ? 7 : currentDay.getDay();
         const dateStr = format(currentDay, 'yyyy-MM-dd');
 
-        const matchingTemplates = DEFAULT_TEMPLATES.filter((t) => t.daysOfWeek.includes(dayOfWeek));
+        const matchingTemplates = activeTemplates.filter((t) => t.daysOfWeek.includes(dayOfWeek));
         for (const tpl of matchingTemplates) {
           currentWeekGenerated.push({
             id: `evt-${dateStr}-${tpl.id}`,
@@ -546,13 +617,22 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         const rosterData = await rosterRes.json();
         if (rosterData.caregivers?.length) setCaregivers(rosterData.caregivers);
         if (rosterData.children?.length) setChildrenList(rosterData.children);
-        if (rosterData.templates?.length) setTemplates(rosterData.templates);
+        // Only load mock templates if user does NOT already have custom blueprints saved
+        if (rosterData.templates?.length) {
+          const localSaved = localStorage.getItem('gcal_blueprints_v2');
+          if (!localSaved) {
+            setTemplates(rosterData.templates);
+          }
+        }
         if (rosterData.holidays) setHolidays(rosterData.holidays);
       }
 
       if (!GoogleCalendarService.isConnected() && scheduleRes && scheduleRes.ok) {
         const scheduleData = await scheduleRes.json();
-        if (scheduleData.events?.length) setEvents(scheduleData.events);
+        const localSavedEvents = localStorage.getItem('gcal_cached_events_v2');
+        if (!localSavedEvents && scheduleData.events?.length) {
+          setEvents(scheduleData.events);
+        }
       }
 
       if (statusRes && statusRes.ok) {
@@ -578,12 +658,35 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const unsubscribe = subscribeToSharedFamilySetup((data) => {
       setCloudSyncActive(true);
       if (data.blueprints && Array.isArray(data.blueprints) && data.blueprints.length > 0) {
-        setTemplates(data.blueprints);
-        try {
-          localStorage.setItem('gcal_blueprints_v2', JSON.stringify(data.blueprints));
-        } catch {}
+        const hasMoe = data.blueprints.some((t) => t.childId === 'moe' || t.title.toLowerCase().includes('moe'));
+        if (!hasMoe) {
+          const moeTemplates = DEFAULT_TEMPLATES.filter((t) => t.childId === 'moe');
+          const mergedBlueprints = [...data.blueprints, ...moeTemplates];
+          setTemplates(mergedBlueprints);
+          try {
+            localStorage.setItem('gcal_blueprints_v2', JSON.stringify(mergedBlueprints));
+          } catch {}
+          saveSharedBlueprints(mergedBlueprints);
+        } else {
+          setTemplates(data.blueprints);
+          try {
+            localStorage.setItem('gcal_blueprints_v2', JSON.stringify(data.blueprints));
+          } catch {}
+        }
       } else if (!data.blueprints || data.blueprints.length === 0) {
-        saveSharedBlueprints(DEFAULT_TEMPLATES);
+        // If Firestore document doesn't have blueprints, check localStorage first!
+        let initialToSave = DEFAULT_TEMPLATES;
+        try {
+          const saved = localStorage.getItem('gcal_blueprints_v2');
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              initialToSave = parsed;
+              setTemplates(parsed);
+            }
+          }
+        } catch {}
+        saveSharedBlueprints(initialToSave);
       }
 
       if (data.caregivers && Array.isArray(data.caregivers) && data.caregivers.length > 0) {
@@ -593,7 +696,15 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
 
       if (data.children && Array.isArray(data.children) && data.children.length > 0) {
-        setChildrenList(data.children);
+        const hasMoe = data.children.some((c) => c.id === 'moe');
+        if (!hasMoe) {
+          const moeChild = DEFAULT_CHILDREN.find((c) => c.id === 'moe')!;
+          const mergedChildren = [...data.children, moeChild];
+          setChildrenList(mergedChildren);
+          saveSharedKids(mergedChildren);
+        } else {
+          setChildrenList(data.children);
+        }
       } else if (!data.children || data.children.length === 0) {
         saveSharedKids(DEFAULT_CHILDREN);
       }
@@ -616,6 +727,15 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       refreshCalendarEvents();
     }
   }, [selectedDate, activeCalendarId, caregiverCalendarMappings]);
+
+  // Persist local schedule events to localStorage so reloads/rebuilds retain event times & assignments
+  useEffect(() => {
+    if (!GoogleCalendarService.isConnected() && events && events.length > 0) {
+      try {
+        localStorage.setItem('gcal_cached_events_v2', JSON.stringify(events));
+      } catch (e) {}
+    }
+  }, [events]);
 
   const changeDateByDays = (days: number) => {
     const curr = new Date(selectedDate + 'T12:00:00');
@@ -890,6 +1010,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       localStorage.removeItem('gcal_blueprints');
       localStorage.removeItem('gcal_blueprints_v2');
       localStorage.removeItem('gcal_pending_sync_queue');
+      localStorage.removeItem('gcal_cached_events_v2');
     } catch (e) {}
     setEvents(DEFAULT_WEEK_EVENTS);
     setCaregivers(DEFAULT_CAREGIVERS);
@@ -1071,12 +1192,15 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       notes: data.notes
     };
 
+    let nextTemplates: EventTemplate[] = [];
     setTemplates((prev) => {
-      const next = [...prev, newTemplate];
-      try { localStorage.setItem('gcal_blueprints_v2', JSON.stringify(next)); } catch (e) {}
-      saveSharedBlueprints(next);
-      return next;
+      nextTemplates = [...prev, newTemplate];
+      try { localStorage.setItem('gcal_blueprints_v2', JSON.stringify(nextTemplates)); } catch (e) {}
+      return nextTemplates;
     });
+    if (nextTemplates.length > 0) {
+      await saveSharedBlueprints(nextTemplates);
+    }
     addToast(`Added Routine Template "${newTemplate.title}"`, 'success');
 
     try {
@@ -1093,17 +1217,27 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     updates: Partial<EventTemplate>, 
     updateCurrentWeekEvents: boolean = true
   ) => {
+    let nextTemplates: EventTemplate[] = [];
     setTemplates((prev) => {
-      const next = prev.map((t) => (t.id === id ? { ...t, ...updates } : t));
-      try { localStorage.setItem('gcal_blueprints_v2', JSON.stringify(next)); } catch (e) {}
-      saveSharedBlueprints(next);
-      return next;
+      nextTemplates = prev.map((t) => (t.id === id ? { ...t, ...updates } : t));
+      try { localStorage.setItem('gcal_blueprints_v2', JSON.stringify(nextTemplates)); } catch (e) {}
+      return nextTemplates;
     });
 
+    if (nextTemplates.length > 0) {
+      await saveSharedBlueprints(nextTemplates);
+    }
+
     if (updateCurrentWeekEvents) {
-      setEvents((prev) =>
-        prev.map((evt) => {
-          if (evt.masterSeriesId === id || evt.id.includes(id)) {
+      setEvents((prev) => {
+        const targetTemplate = nextTemplates.find((t) => t.id === id);
+        const templateTitle = targetTemplate?.title || updates.title;
+        const nextEvts = prev.map((evt) => {
+          const matchesMaster = evt.masterSeriesId === id;
+          const matchesId = evt.id.includes(id);
+          const matchesTitle = templateTitle && evt.title.toLowerCase() === templateTitle.toLowerCase();
+
+          if (matchesMaster || matchesId || matchesTitle) {
             return {
               ...evt,
               title: updates.title !== undefined ? updates.title : evt.title,
@@ -1118,8 +1252,10 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             };
           }
           return evt;
-        })
-      );
+        });
+        try { localStorage.setItem('gcal_cached_events_v2', JSON.stringify(nextEvts)); } catch (e) {}
+        return nextEvts;
+      });
     }
 
     addToast(`Updated blueprint "${updates.title || 'Event'}"`, 'success');
@@ -1134,12 +1270,15 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const deleteTemplate = async (id: string) => {
+    let nextTemplates: EventTemplate[] = [];
     setTemplates((prev) => {
-      const next = prev.filter((t) => t.id !== id);
-      try { localStorage.setItem('gcal_blueprints_v2', JSON.stringify(next)); } catch (e) {}
-      saveSharedBlueprints(next);
-      return next;
+      nextTemplates = prev.filter((t) => t.id !== id);
+      try { localStorage.setItem('gcal_blueprints_v2', JSON.stringify(nextTemplates)); } catch (e) {}
+      return nextTemplates;
     });
+    if (nextTemplates.length >= 0) {
+      await saveSharedBlueprints(nextTemplates);
+    }
     addToast('Template removed from blueprint.', 'info');
     try {
       await fetch(`/api/templates/${id}`, { method: 'DELETE' });
@@ -1178,12 +1317,15 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         notes: data.notes
       };
 
+      let nextTemplates: EventTemplate[] = [];
       setTemplates((prev) => {
-        const next = [...prev, newTemplate];
-        try { localStorage.setItem('gcal_blueprints_v2', JSON.stringify(next)); } catch (e) {}
-        saveSharedBlueprints(next);
-        return next;
+        nextTemplates = [...prev, newTemplate];
+        try { localStorage.setItem('gcal_blueprints_v2', JSON.stringify(nextTemplates)); } catch (e) {}
+        return nextTemplates;
       });
+      if (nextTemplates.length > 0) {
+        await saveSharedBlueprints(nextTemplates);
+      }
 
       // Generate for the current week of the given date
       const baseDate = new Date(data.date + 'T12:00:00');

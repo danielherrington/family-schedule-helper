@@ -55,6 +55,14 @@ export const DEFAULT_CHILDREN: Child[] = [
     badgeBg: 'rgba(5, 150, 105, 0.12)',
     badgeBorder: 'rgba(5, 150, 105, 0.35)',
     school: 'Lehrman / North Beach Elementary'
+  },
+  {
+    id: 'moe',
+    name: 'Moe 🐕',
+    color: '#D97706', // Golden Amber
+    badgeBg: 'rgba(217, 119, 6, 0.12)',
+    badgeBorder: 'rgba(217, 119, 6, 0.35)',
+    school: 'Family Dog'
   }
 ];
 
@@ -189,6 +197,28 @@ export const DEFAULT_TEMPLATES: EventTemplate[] = [
     startTime: '09:00',
     endTime: '10:00',
     location: 'Miami Ballet Studio',
+    defaultCaregiverId: 'elizabeth'
+  },
+  {
+    id: 'tpl-moe-morning-walk',
+    title: 'Walk Moe 🐕 (Morning)',
+    childId: 'moe',
+    category: 'routine',
+    daysOfWeek: [1, 2, 3, 4, 5, 6, 7],
+    startTime: '07:15',
+    endTime: '07:45',
+    location: 'Neighborhood Walk',
+    defaultCaregiverId: 'daniel'
+  },
+  {
+    id: 'tpl-moe-evening-walk',
+    title: 'Walk Moe 🐕 (Evening)',
+    childId: 'moe',
+    category: 'routine',
+    daysOfWeek: [1, 2, 3, 4, 5, 6, 7],
+    startTime: '18:30',
+    endTime: '19:00',
+    location: 'Neighborhood Walk',
     defaultCaregiverId: 'elizabeth'
   }
 ];

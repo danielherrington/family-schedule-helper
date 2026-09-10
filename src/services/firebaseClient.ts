@@ -41,56 +41,75 @@ const FAMILY_DOC_REF = doc(db, 'family', DOC_NAME);
 const PROD_DOC_REF = doc(db, 'family', 'setup');
 
 /**
+ * Strips undefined properties recursively so Cloud Firestore does not throw serialization errors
+ */
+function cleanForFirestore<T>(data: T): any {
+  return JSON.parse(JSON.stringify(data));
+}
+
+/**
  * Saves blueprints to shared Cloud Firestore
  */
-export async function saveSharedBlueprints(blueprints: EventTemplate[]): Promise<void> {
+export async function saveSharedBlueprints(blueprints: EventTemplate[]): Promise<boolean> {
   try {
+    const cleanBlueprints = cleanForFirestore(blueprints);
     await setDoc(
       FAMILY_DOC_REF, 
       { 
-        blueprints, 
+        blueprints: cleanBlueprints, 
         updatedAt: new Date().toISOString() 
       }, 
       { merge: true }
     );
+    console.log(`[Firestore] Successfully saved ${cleanBlueprints.length} blueprints to /family/${DOC_NAME}`);
+    return true;
   } catch (err) {
-    console.warn('Firestore saveSharedBlueprints error:', err);
+    console.error('[Firestore] saveSharedBlueprints error:', err);
+    return false;
   }
 }
 
 /**
  * Saves caregivers to shared Cloud Firestore
  */
-export async function saveSharedCaregivers(caregivers: Caregiver[]): Promise<void> {
+export async function saveSharedCaregivers(caregivers: Caregiver[]): Promise<boolean> {
   try {
+    const cleanCaregivers = cleanForFirestore(caregivers);
     await setDoc(
       FAMILY_DOC_REF, 
       { 
-        caregivers, 
+        caregivers: cleanCaregivers, 
         updatedAt: new Date().toISOString() 
       }, 
       { merge: true }
     );
+    console.log(`[Firestore] Successfully saved ${cleanCaregivers.length} caregivers to /family/${DOC_NAME}`);
+    return true;
   } catch (err) {
-    console.warn('Firestore saveSharedCaregivers error:', err);
+    console.error('[Firestore] saveSharedCaregivers error:', err);
+    return false;
   }
 }
 
 /**
  * Saves children list to shared Cloud Firestore
  */
-export async function saveSharedKids(children: Child[]): Promise<void> {
+export async function saveSharedKids(children: Child[]): Promise<boolean> {
   try {
+    const cleanKids = cleanForFirestore(children);
     await setDoc(
       FAMILY_DOC_REF, 
       { 
-        children, 
+        children: cleanKids, 
         updatedAt: new Date().toISOString() 
       }, 
       { merge: true }
     );
+    console.log(`[Firestore] Successfully saved ${cleanKids.length} children to /family/${DOC_NAME}`);
+    return true;
   } catch (err) {
-    console.warn('Firestore saveSharedKids error:', err);
+    console.error('[Firestore] saveSharedKids error:', err);
+    return false;
   }
 }
 
@@ -99,18 +118,22 @@ export async function saveSharedKids(children: Child[]): Promise<void> {
  */
 export async function saveSharedCalendarMappings(
   calendarMappings: Record<string, { calendarId: string; calendarName: string }>
-): Promise<void> {
+): Promise<boolean> {
   try {
+    const cleanMappings = cleanForFirestore(calendarMappings);
     await setDoc(
       FAMILY_DOC_REF,
       {
-        calendarMappings,
+        calendarMappings: cleanMappings,
         updatedAt: new Date().toISOString()
       },
       { merge: true }
     );
+    console.log(`[Firestore] Successfully saved calendar mappings to /family/${DOC_NAME}`);
+    return true;
   } catch (err) {
-    console.warn('Firestore saveSharedCalendarMappings error:', err);
+    console.error('[Firestore] saveSharedCalendarMappings error:', err);
+    return false;
   }
 }
 

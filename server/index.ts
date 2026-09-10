@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
 import { 
   INITIAL_CAREGIVERS, 
   INITIAL_CHILDREN, 
@@ -21,10 +23,36 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-// In-memory state store for Demo/Interactive Mode
+// Disk persistence for server templates
+const TEMPLATES_STORE_FILE = path.resolve(process.cwd(), 'server/templates_store.json');
+
+function loadTemplatesFromDisk(): EventTemplate[] {
+  try {
+    if (fs.existsSync(TEMPLATES_STORE_FILE)) {
+      const content = fs.readFileSync(TEMPLATES_STORE_FILE, 'utf-8');
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn('Notice: Failed loading templates from disk, falling back to initial seeds.');
+  }
+  return [...INITIAL_EVENT_TEMPLATES];
+}
+
+function saveTemplatesToDisk(templates: EventTemplate[]): void {
+  try {
+    fs.writeFileSync(TEMPLATES_STORE_FILE, JSON.stringify(templates, null, 2), 'utf-8');
+  } catch (e) {
+    console.warn('Notice: Failed writing templates to disk.');
+  }
+}
+
+// State store for Demo/Interactive Mode
 let caregiversState: Caregiver[] = [...INITIAL_CAREGIVERS];
 let childrenState: Child[] = [...INITIAL_CHILDREN];
-let templatesState: EventTemplate[] = [...INITIAL_EVENT_TEMPLATES];
+let templatesState: EventTemplate[] = loadTemplatesFromDisk();
 let eventsState = getWeekSchedule();
 let holidaysState: { date: string; name: string; childId: string }[] = [];
 let auditLog: any[] = [];
@@ -164,12 +192,44 @@ app.post('/api/templates', (req, res) => {
   };
 
   templatesState.push(newTemplate);
+  saveTemplatesToDisk(templatesState);
   res.status(201).json({ success: true, template: newTemplate });
+});
+
+app.put('/api/templates/:id', (req, res) => {
+  const { id } = req.params;
+  const index = templatesState.findIndex((t) => t.id === id);
+  if (index === -1) return res.status(404).json({ error: 'Template not found' });
+
+  const prevTpl = templatesState[index];
+  templatesState[index] = { ...templatesState[index], ...req.body };
+  saveTemplatesToDisk(templatesState);
+
+  // Sync any active server events that match this blueprint
+  const targetTitle = prevTpl.title;
+  eventsState = eventsState.map((evt) => {
+    if (evt.masterSeriesId === id || evt.id.includes(id) || evt.title.toLowerCase() === targetTitle.toLowerCase()) {
+      return {
+        ...evt,
+        ...(req.body.title ? { title: req.body.title } : {}),
+        ...(req.body.childId ? { childId: req.body.childId } : {}),
+        ...(req.body.category ? { category: req.body.category } : {}),
+        ...(req.body.startTime ? { startTime: req.body.startTime } : {}),
+        ...(req.body.endTime ? { endTime: req.body.endTime } : {}),
+        ...(req.body.location ? { location: req.body.location } : {}),
+        ...(req.body.defaultCaregiverId && evt.assignedTo === 'unassigned' ? { assignedTo: req.body.defaultCaregiverId } : {})
+      };
+    }
+    return evt;
+  });
+
+  res.json({ success: true, template: templatesState[index] });
 });
 
 app.delete('/api/templates/:id', (req, res) => {
   const { id } = req.params;
   templatesState = templatesState.filter((t) => t.id !== id);
+  saveTemplatesToDisk(templatesState);
   res.json({ success: true, id });
 });
 
