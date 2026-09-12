@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useSchedule } from '../../context/ScheduleContext';
-import { Plus, Trash2, Pencil, Check, X } from 'lucide-react';
+import { Plus, Trash2, Pencil, Check, X, Plane } from 'lucide-react';
 
 export const CaregiversTab: React.FC = () => {
   const { 
@@ -10,7 +10,9 @@ export const CaregiversTab: React.FC = () => {
     deleteCaregiver,
     caregiverCalendarMappings,
     setCaregiverCalendarMapping,
-    userCalendars
+    userCalendars,
+    setIsTravelModalOpen,
+    caregiverTravels
   } = useSchedule();
 
   // New Caregiver Form State
@@ -66,6 +68,51 @@ export const CaregiversTab: React.FC = () => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <div style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
         💡 <strong>Potential Caregivers</strong> are the adults and helpers who take turns driving and managing pick-ups (Parents, Nannies, Grandparents). Each caregiver can have their shared Google Calendar ID linked.
+      </div>
+
+      {/* Travel & Out of Town Quick Launcher */}
+      <div 
+        style={{
+          background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.08))',
+          border: '1px solid rgba(59, 130, 246, 0.3)',
+          borderRadius: '10px',
+          padding: '12px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '12px',
+          flexWrap: 'wrap'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Plane size={20} color="#3b82f6" />
+          <div>
+            <div style={{ fontWeight: 800, fontSize: '0.875rem', color: 'var(--text)' }}>
+              Out of Town / Travel Coverage
+            </div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+              {caregiverTravels.length > 0
+                ? `${caregiverTravels.length} active/scheduled travel route(s) configured.`
+                : 'Traveling for work? Auto-route your driving shifts and duties to another caregiver.'}
+            </div>
+          </div>
+        </div>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => setIsTravelModalOpen(true)}
+          style={{
+            borderColor: '#3b82f6',
+            color: '#2563eb',
+            background: 'rgba(59, 130, 246, 0.1)',
+            fontWeight: 700,
+            fontSize: '0.8rem',
+            padding: '5px 12px'
+          }}
+        >
+          <Plane size={14} />
+          <span>{caregiverTravels.length > 0 ? 'Manage Travel' : 'Set Up Travel Coverage'}</span>
+        </button>
       </div>
 
       {/* Existing Caregivers */}

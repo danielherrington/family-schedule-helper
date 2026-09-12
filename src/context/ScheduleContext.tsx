@@ -8,7 +8,8 @@ import {
   CaregiverId, 
   EventTemplate, 
   DayHoliday,
-  StagedSyncItem 
+  StagedSyncItem,
+  CaregiverTravel 
 } from '../types/schedule';
 import { 
   DEFAULT_CAREGIVERS, 
@@ -23,6 +24,7 @@ import {
   saveSharedCaregivers, 
   saveSharedKids, 
   saveSharedCalendarMappings,
+  saveSharedTravels,
   subscribeToSharedFamilySetup 
 } from '../services/firebaseClient';
 
@@ -86,6 +88,13 @@ interface ScheduleContextType {
   setIsSundayAlertOpen: (open: boolean) => void;
   setIsAddEventOpen: (open: boolean) => void;
   openAddEventModal: (dateStr?: string) => void;
+  setIsTravelModalOpen: (open: boolean) => void;
+  isTravelModalOpen: boolean;
+  caregiverTravels: CaregiverTravel[];
+  addCaregiverTravel: (travel: Omit<CaregiverTravel, 'id' | 'createdAt'>) => Promise<void>;
+  removeCaregiverTravel: (travelId: string, restoreOriginal?: boolean) => Promise<void>;
+  isCaregiverOutOfTown: (caregiverId: string, dateStr: string) => boolean;
+  getCaregiverTravelForDate: (caregiverId: string, dateStr: string) => CaregiverTravel | undefined;
   setActiveSetupTab: (tab: 'caregivers' | 'kids' | 'blueprint') => void;
   resetToDemoSchedule: () => Promise<void>;
   addToast: (message: string, type?: 'success' | 'info' | 'warning' | 'error') => void;
@@ -206,7 +215,14 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             try { localStorage.setItem('gcal_cached_events_v2', JSON.stringify(merged)); } catch {}
             return merged;
           }
-          return parsed;
+          // Ensure any existing Moe walks that were accidentally cancelled by holidays are restored to confirmed
+          const uncancelled = parsed.map((e: DispatchEvent) => {
+            if (e.childId === 'moe' && e.status === 'cancelled') {
+              return { ...e, status: 'confirmed' as const, cancellationReason: undefined };
+            }
+            return e;
+          });
+          return uncancelled;
         }
       }
     } catch {}
@@ -381,6 +397,17 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [isAddEventOpen, setIsAddEventOpen] = useState<boolean>(false);
   const [addEventInitialDate, setAddEventInitialDate] = useState<string>(() => getTodayDateStr());
   const [activeSetupTab, setActiveSetupTab] = useState<'caregivers' | 'kids' | 'blueprint'>('caregivers');
+  const [isTravelModalOpen, setIsTravelModalOpen] = useState<boolean>(false);
+  const [caregiverTravels, setCaregiverTravels] = useState<CaregiverTravel[]>(() => {
+    try {
+      const saved = localStorage.getItem('gcal_caregiver_travels');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  });
 
   // Staged Sync State ("Safe Mode")
   const [syncMode, setSyncModeState] = useState<'staged' | 'immediate'>(() => {
@@ -715,6 +742,13 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           localStorage.setItem('gcal_caregiver_calendar_map', JSON.stringify(data.calendarMappings));
         } catch {}
       }
+
+      if (data.travels && Array.isArray(data.travels)) {
+        setCaregiverTravels(data.travels);
+        try {
+          localStorage.setItem('gcal_caregiver_travels', JSON.stringify(data.travels));
+        } catch {}
+      }
     });
 
     return () => {
@@ -972,13 +1006,30 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } catch (err) {}
   };
 
-  // Mark Full Day as Holiday
+  // Mark Full Day as Holiday (Protects Moe Dog Walks)
   const markDayAsHoliday = async (dateStr: string, holidayName: string, childId: string = 'all') => {
     let cancelledCount = 0;
+    let revivedMoeCount = 0;
+
     const updated = events.map((e) => {
       const matchesDate = e.date === dateStr;
+      const isMoeWalk = e.childId === 'moe' || 
+                        e.title.toLowerCase().includes('moe') || 
+                        e.title.toLowerCase().includes('walk');
+
+      // 1. If this is a Moe walk and was previously marked cancelled, revive it!
+      if (matchesDate && isMoeWalk && e.status === 'cancelled') {
+        revivedMoeCount++;
+        return {
+          ...e,
+          status: 'confirmed' as const,
+          cancellationReason: undefined
+        };
+      }
+
+      // 2. Cancel school / kids duties (NEVER cancel Moe dog walks)
       const matchesChild = childId === 'all' || e.childId === childId || e.childId === 'all';
-      if (matchesDate && matchesChild) {
+      if (matchesDate && matchesChild && !isMoeWalk) {
         cancelledCount++;
         return {
           ...e,
@@ -991,10 +1042,15 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
 
     setEvents(updated);
+    try {
+      localStorage.setItem('gcal_cached_events_v2', JSON.stringify(updated));
+    } catch {}
     setHolidays((prev) => [...prev.filter((h) => h.date !== dateStr), { date: dateStr, name: holidayName, childId }]);
 
-
-    addToast(`🌴 Marked ${dateStr} as "${holidayName}" (${cancelledCount} duties cancelled)`, 'success');
+    const toastMsg = revivedMoeCount > 0
+      ? `🌴 Marked ${dateStr} as "${holidayName}" (${cancelledCount} school duties cancelled, Moe walks kept active)`
+      : `🌴 Marked ${dateStr} as "${holidayName}" (${cancelledCount} school duties cancelled, Moe walks kept active)`;
+    addToast(toastMsg, 'success');
 
     try {
       await fetch('/api/schedule/mark-day-holiday', {
@@ -1003,6 +1059,104 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         body: JSON.stringify({ date: dateStr, holidayName, childId })
       });
     } catch (err) {}
+  };
+
+  // Caregiver Out-of-Town / Travel Management
+  const isCaregiverOutOfTown = (caregiverId: string, dateStr: string): boolean => {
+    return caregiverTravels.some(
+      (t) => t.caregiverId === caregiverId && dateStr >= t.startDate && dateStr <= t.endDate
+    );
+  };
+
+  const getCaregiverTravelForDate = (caregiverId: string, dateStr: string): CaregiverTravel | undefined => {
+    return caregiverTravels.find(
+      (t) => t.caregiverId === caregiverId && dateStr >= t.startDate && dateStr <= t.endDate
+    );
+  };
+
+  const addCaregiverTravel = async (travelData: Omit<CaregiverTravel, 'id' | 'createdAt'>) => {
+    const newTravel: CaregiverTravel = {
+      ...travelData,
+      id: `travel-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      createdAt: new Date().toISOString()
+    };
+
+    const updatedTravels = [...caregiverTravels, newTravel];
+    setCaregiverTravels(updatedTravels);
+    try {
+      localStorage.setItem('gcal_caregiver_travels', JSON.stringify(updatedTravels));
+    } catch {}
+    saveSharedTravels(updatedTravels);
+
+    const travelingCg = caregivers.find((c) => c.id === travelData.caregiverId)?.name || travelData.caregiverId;
+    const targetCg = caregivers.find((c) => c.id === travelData.routeToCaregiverId)?.name || travelData.routeToCaregiverId;
+
+    let reassignedCount = 0;
+    const updatedEvents = events.map((e) => {
+      const inRange = e.date >= travelData.startDate && e.date <= travelData.endDate;
+      const isAssigned = e.assignedTo === travelData.caregiverId;
+      const isActive = e.status !== 'cancelled' && e.status !== 'no_pickup_needed';
+
+      if (inRange && isAssigned && isActive) {
+        reassignedCount++;
+        return {
+          ...e,
+          assignedTo: travelData.routeToCaregiverId,
+          isException: true,
+          travelCoveringFor: travelData.caregiverId,
+          notes: e.notes ? `${e.notes} [Auto-routed: ${travelingCg} out of town]` : `[Auto-routed: ${travelingCg} out of town]`
+        };
+      }
+      return e;
+    });
+
+    setEvents(updatedEvents);
+    try {
+      localStorage.setItem('gcal_cached_events_v2', JSON.stringify(updatedEvents));
+    } catch {}
+
+    addToast(`✈️ Marked ${travelingCg} out of town (${travelData.startDate} to ${travelData.endDate}). Auto-routed ${reassignedCount} duties to ${targetCg}!`, 'success');
+  };
+
+  const removeCaregiverTravel = async (travelId: string, restoreOriginal: boolean = true) => {
+    const targetTravel = caregiverTravels.find((t) => t.id === travelId);
+    if (!targetTravel) return;
+
+    const updatedTravels = caregiverTravels.filter((t) => t.id !== travelId);
+    setCaregiverTravels(updatedTravels);
+    try {
+      localStorage.setItem('gcal_caregiver_travels', JSON.stringify(updatedTravels));
+    } catch {}
+    saveSharedTravels(updatedTravels);
+
+    const travelingCg = caregivers.find((c) => c.id === targetTravel.caregiverId)?.name || targetTravel.caregiverId;
+    let restoredCount = 0;
+
+    if (restoreOriginal) {
+      const updatedEvents = events.map((e) => {
+        const inRange = e.date >= targetTravel.startDate && e.date <= targetTravel.endDate;
+        const isCovering = e.assignedTo === targetTravel.routeToCaregiverId && e.travelCoveringFor === targetTravel.caregiverId;
+
+        if (inRange && isCovering) {
+          restoredCount++;
+          const cleanedNotes = e.notes ? e.notes.replace(/\[Auto-routed:[^\]]+\]/g, '').trim() : undefined;
+          return {
+            ...e,
+            assignedTo: targetTravel.caregiverId,
+            travelCoveringFor: undefined,
+            notes: cleanedNotes || undefined
+          };
+        }
+        return e;
+      });
+
+      setEvents(updatedEvents);
+      try {
+        localStorage.setItem('gcal_cached_events_v2', JSON.stringify(updatedEvents));
+      } catch {}
+    }
+
+    addToast(`✈️ Removed travel for ${travelingCg}${restoreOriginal && restoredCount > 0 ? ` (Restored ${restoredCount} duties)` : ''}.`, 'info');
   };
 
   const resetToDemoSchedule = async () => {
@@ -1531,11 +1685,27 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const matchingTemplates = templates.filter((t) => t.daysOfWeek.includes(dayOfWeek));
 
       for (const tpl of matchingTemplates) {
+        let assignedCaregiver = tpl.defaultCaregiverId;
+        let coveringFor: string | undefined = undefined;
+        let eventNotes = tpl.notes;
+
+        // Auto-route if default caregiver is traveling on this day!
+        const activeTravel = caregiverTravels.find(
+          (t) => t.caregiverId === tpl.defaultCaregiverId && dateStr >= t.startDate && dateStr <= t.endDate
+        );
+        if (activeTravel) {
+          assignedCaregiver = activeTravel.routeToCaregiverId;
+          coveringFor = activeTravel.caregiverId;
+          const travelingName = caregivers.find((c) => c.id === activeTravel.caregiverId)?.name || activeTravel.caregiverId;
+          eventNotes = eventNotes ? `${eventNotes} [Auto-routed: ${travelingName} out of town]` : `[Auto-routed: ${travelingName} out of town]`;
+        }
+
         generatedEvents.push({
           id: `evt-${dateStr}-${tpl.id}`,
           title: tpl.title,
           childId: tpl.childId,
-          assignedTo: tpl.defaultCaregiverId,
+          assignedTo: assignedCaregiver,
+          travelCoveringFor: coveringFor,
           date: dateStr,
           startTime: tpl.startTime,
           endTime: tpl.endTime,
@@ -1543,8 +1713,8 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           category: tpl.category,
           isRecurringMaster: true,
           masterSeriesId: tpl.id,
-          notes: tpl.notes,
-          status: tpl.defaultCaregiverId === 'unassigned' ? 'unassigned' : 'confirmed'
+          notes: eventNotes,
+          status: assignedCaregiver === 'unassigned' ? 'unassigned' : 'confirmed'
         });
       }
     }
@@ -1604,6 +1774,13 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setIsAddEventOpen,
         addEventInitialDate,
         openAddEventModal,
+        isTravelModalOpen,
+        setIsTravelModalOpen,
+        caregiverTravels,
+        addCaregiverTravel,
+        removeCaregiverTravel,
+        isCaregiverOutOfTown,
+        getCaregiverTravelForDate,
         setActiveSetupTab,
         resetToDemoSchedule,
         addToast,

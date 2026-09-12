@@ -4,6 +4,7 @@ import { Header } from './components/Header';
 import { WeekStripNavigator } from './components/WeekStripNavigator';
 import { GapAlertBanner } from './components/GapAlertBanner';
 import { HolidaySuggestionBanner } from './components/HolidaySuggestionBanner';
+import { TravelBanner } from './components/TravelBanner';
 import { VisualWeeklyCalendarGrid } from './components/VisualWeeklyCalendarGrid';
 import { DailyDispatchBoard } from './components/DailyDispatchBoard';
 import { WeeklyMatrixView } from './components/WeeklyMatrixView';
@@ -12,6 +13,7 @@ import { CalendarSettingsModal } from './components/CalendarSettingsModal';
 import { AuditLogModal } from './components/AuditLogModal';
 import { SetupHubModal } from './components/SetupHubModal';
 import { SundayAlertModal } from './components/SundayAlertModal';
+import { TravelModal } from './components/TravelModal';
 import { AddEventModal } from './components/AddEventModal';
 import { SyncReviewModal } from './components/SyncReviewModal';
 import { CheckCircle2, AlertCircle, Info, AlertTriangle } from 'lucide-react';
@@ -26,6 +28,7 @@ export const AppContent: React.FC = () => {
       <main className="main-content">
         <GapAlertBanner />
         <HolidaySuggestionBanner />
+        <TravelBanner />
         <WeekStripNavigator />
 
         {isLoading ? (
@@ -48,6 +51,7 @@ export const AppContent: React.FC = () => {
       <AddEventModal />
       <SetupHubModal />
       <SundayAlertModal />
+      <TravelModal />
       <QuickAssignModal />
       <CalendarSettingsModal />
       <AuditLogModal />

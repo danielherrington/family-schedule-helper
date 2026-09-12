@@ -42,6 +42,17 @@ export interface DispatchEvent {
   cancellationReason?: string;
   isHoliday?: boolean;
   hasConflict?: boolean;
+  travelCoveringFor?: CaregiverId;
+}
+
+export interface CaregiverTravel {
+  id: string;
+  caregiverId: CaregiverId;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  routeToCaregiverId: CaregiverId;
+  reason?: string;
+  createdAt: string;
 }
 
 export interface DayHoliday {

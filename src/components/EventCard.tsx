@@ -13,7 +13,8 @@ import {
   Ban,
   UserX,
   Smile,
-  Trash2
+  Trash2,
+  Plane
 } from 'lucide-react';
 
 interface EventCardProps {
@@ -28,6 +29,7 @@ export const EventCard: React.FC<EventCardProps> = ({ event }) => {
     cancelEventInstance, 
     markNoPickupNeeded,
     restoreEventInstance,
+    isCaregiverOutOfTown,
     setReassignModalEvent
   } = useSchedule();
   
@@ -237,7 +239,20 @@ export const EventCard: React.FC<EventCardProps> = ({ event }) => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          {event.isException ? (
+          {event.travelCoveringFor ? (
+            <span 
+              className="status-badge"
+              style={{
+                background: 'rgba(59, 130, 246, 0.15)',
+                color: '#2563eb',
+                border: '1px solid rgba(59, 130, 246, 0.3)'
+              }}
+              title={`Covering for ${caregivers.find((c) => c.id === event.travelCoveringFor)?.name || event.travelCoveringFor} (Out of Town)`}
+            >
+              <Plane size={11} />
+              <span>Covering for {caregivers.find((c) => c.id === event.travelCoveringFor)?.name.split(' ')[0] || event.travelCoveringFor}</span>
+            </span>
+          ) : event.isException ? (
             <span className="status-badge exception" title="Single day override. Master repeating series unaffected.">
               <Sparkles size={12} />
               <span>Override</span>
@@ -393,16 +408,18 @@ export const EventCard: React.FC<EventCardProps> = ({ event }) => {
       <div className="caregiver-checkbox-row">
         {caregivers.map((cg) => {
           const isSelected = event.assignedTo === cg.id && !isNoPickupNeeded;
+          const isOutOfTown = isCaregiverOutOfTown(cg.id, event.date);
           return (
             <button
               key={cg.id}
               type="button"
               className={`caregiver-checkbox-pill ${isSelected ? 'selected' : ''}`}
               onClick={() => handleSelectCaregiver(cg.id)}
-              title={`Assign to ${cg.name}`}
+              title={isOutOfTown ? `Assign to ${cg.name} (✈️ Out of Town on this day)` : `Assign to ${cg.name}`}
               style={{
                 borderColor: isSelected ? cg.avatarColor : undefined,
-                background: isSelected ? `${cg.avatarColor}18` : undefined
+                background: isSelected ? `${cg.avatarColor}18` : undefined,
+                opacity: isOutOfTown && !isSelected ? 0.65 : 1
               }}
             >
               <span 
@@ -416,6 +433,7 @@ export const EventCard: React.FC<EventCardProps> = ({ event }) => {
               </span>
               <span className="cg-label" style={{ color: isSelected ? cg.avatarColor : 'var(--text-muted)' }}>
                 {cg.name.split(' ')[0]}
+                {isOutOfTown && <span style={{ fontSize: '0.65rem', marginLeft: '2px' }}>✈️</span>}
               </span>
             </button>
           );

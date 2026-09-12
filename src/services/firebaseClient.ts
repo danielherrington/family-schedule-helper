@@ -7,7 +7,7 @@ import {
   onSnapshot, 
   Unsubscribe 
 } from 'firebase/firestore';
-import { EventTemplate, Caregiver, Child } from '../types/schedule';
+import { EventTemplate, Caregiver, Child, CaregiverTravel } from '../types/schedule';
 
 export const firebaseConfig = {
   apiKey: "AIzaSyC7nXGYQOah5puALpFWK75bulFzgiaFwwA",
@@ -26,6 +26,7 @@ export interface FamilySetupDoc {
   caregivers?: Caregiver[];
   children?: Child[];
   calendarMappings?: Record<string, { calendarId: string; calendarName: string }>;
+  travels?: CaregiverTravel[];
   updatedAt?: string;
   updatedBy?: string;
 }
@@ -133,6 +134,28 @@ export async function saveSharedCalendarMappings(
     return true;
   } catch (err) {
     console.error('[Firestore] saveSharedCalendarMappings error:', err);
+    return false;
+  }
+}
+
+/**
+ * Saves caregiver travel records to shared Cloud Firestore
+ */
+export async function saveSharedTravels(travels: CaregiverTravel[]): Promise<boolean> {
+  try {
+    const cleanTravels = cleanForFirestore(travels);
+    await setDoc(
+      FAMILY_DOC_REF,
+      {
+        travels: cleanTravels,
+        updatedAt: new Date().toISOString()
+      },
+      { merge: true }
+    );
+    console.log(`[Firestore] Successfully saved ${cleanTravels.length} travel records to /family/${DOC_NAME}`);
+    return true;
+  } catch (err) {
+    console.error('[Firestore] saveSharedTravels error:', err);
     return false;
   }
 }

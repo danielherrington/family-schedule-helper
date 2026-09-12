@@ -14,7 +14,8 @@ import {
   CalendarDays,
   Bell,
   Plus,
-  CloudUpload
+  CloudUpload,
+  Plane
 } from 'lucide-react';
 
 import { isTodayOrUpcoming, getTodayDateStr } from '../utils/dateUtils';
@@ -37,6 +38,8 @@ export const Header: React.FC = () => {
     setIsAuditLogOpen,
     setIsSetupOpen,
     setIsSundayAlertOpen,
+    setIsTravelModalOpen,
+    caregiverTravels,
     openAddEventModal,
     resetToDemoSchedule 
   } = useSchedule();
@@ -150,6 +153,22 @@ export const Header: React.FC = () => {
             >
               <Users size={16} />
               <span className="hide-mobile">Family Setup</span>
+            </button>
+
+            {/* Out of Town / Travel Coverage Button */}
+            <button 
+              className="btn"
+              onClick={() => setIsTravelModalOpen(true)}
+              title="Mark caregivers traveling for work and auto-route roles"
+              style={{ 
+                fontWeight: 700,
+                borderColor: caregiverTravels.length > 0 ? '#3b82f6' : undefined,
+                color: caregiverTravels.length > 0 ? '#2563eb' : undefined,
+                background: caregiverTravels.length > 0 ? 'rgba(59, 130, 246, 0.12)' : undefined
+              }}
+            >
+              <Plane size={15} />
+              <span className="hide-mobile">Out of Town{caregiverTravels.length > 0 ? ` (${caregiverTravels.length})` : ''}</span>
             </button>
 
             {gaps.length > 0 && (

@@ -117,6 +117,9 @@ export const HolidayModal: React.FC<HolidayModalProps> = ({ isOpen, onClose, tar
         <Palmtree size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
         <div>
           Cancelling duties for this day will mark them as <strong>"🌴 No Class / Holiday"</strong> and suppress driver assignments without breaking recurring schedules for subsequent weeks.
+          <div style={{ marginTop: '6px', fontSize: '0.8rem', color: '#047857', fontWeight: 600 }}>
+            🐕 <em>Note: Dog walks (Moe 🐕) remain scheduled and active during holidays.</em>
+          </div>
         </div>
       </div>
 
