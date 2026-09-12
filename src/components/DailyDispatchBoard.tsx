@@ -70,7 +70,7 @@ export const DailyDispatchBoard: React.FC = () => {
   const totalCancelled = dayEvents.filter((e) => e.status === 'cancelled').length;
 
   const activeHoliday = holidays.find((h) => h.date === selectedDate);
-  const detectedHoliday = getHolidayForDate(selectedDate);
+  const detectedHoliday = isTodayOrUpcoming(selectedDate) ? getHolidayForDate(selectedDate) : null;
 
   return (
     <div>

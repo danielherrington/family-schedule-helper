@@ -50,7 +50,7 @@ export const WeekStripNavigator: React.FC = () => {
                   <span className="mini-status-icon holiday" title="Holiday / Day Off Marked">
                     <Palmtree size={11} color="#10b981" />
                   </span>
-                ) : knownHoliday ? (
+                ) : (knownHoliday && isTodayOrUpcoming(d.fullDate)) ? (
                   <span className="mini-status-icon" title={`Upcoming Holiday: ${knownHoliday.name}`}>
                     <Palmtree size={11} color={knownHoliday.category === 'jewish' ? '#c4b5fd' : '#93c5fd'} />
                   </span>

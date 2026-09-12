@@ -3,6 +3,7 @@ import { useSchedule } from '../context/ScheduleContext';
 import { getHolidaysForDates, HolidayInfo } from '../utils/holidayEngine';
 import { Palmtree, Sparkles, X, Check, Calendar } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { isTodayOrUpcoming } from '../utils/dateUtils';
 
 export const HolidaySuggestionBanner: React.FC = () => {
   const { currentWeekDays, holidays, markDayAsHoliday } = useSchedule();
@@ -12,11 +13,12 @@ export const HolidaySuggestionBanner: React.FC = () => {
   const weekDateStrings = currentWeekDays.map((d) => format(d, 'yyyy-MM-dd'));
   const holidaysInWeek = getHolidaysForDates(weekDateStrings);
 
-  // Find holidays that have not yet been marked in the schedule and not dismissed
+  // Find holidays that have not yet been marked in the schedule, not dismissed, and have not already passed
   const pendingHolidays = holidaysInWeek.filter((h) => {
     const isAlreadyMarked = holidays.some((hm) => hm.date === h.date);
     const isDismissed = dismissedHolidays.includes(h.date);
-    return !isAlreadyMarked && !isDismissed;
+    const isUpcoming = isTodayOrUpcoming(h.date);
+    return !isAlreadyMarked && !isDismissed && isUpcoming;
   });
 
   if (pendingHolidays.length === 0) return null;

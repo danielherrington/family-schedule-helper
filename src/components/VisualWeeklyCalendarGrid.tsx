@@ -4,7 +4,7 @@ import { DispatchEvent } from '../types/schedule';
 import { HolidayModal } from './HolidayModal';
 import { format, parseISO } from 'date-fns';
 import { getHolidayForDate } from '../utils/holidayEngine';
-import { getTodayDateStr } from '../utils/dateUtils';
+import { getTodayDateStr, isTodayOrUpcoming } from '../utils/dateUtils';
 import { 
   Filter, 
   Sparkles, 
@@ -237,7 +237,7 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
                     <span className="day-name-label">{d.shortName}</span>
                     <span className="day-number-label">{d.dateNum}</span>
                   </div>
-                  {knownHoliday && !dayHoliday && (
+                  {knownHoliday && !dayHoliday && isTodayOrUpcoming(d.dateStr) && (
                     <span style={{ fontSize: '0.625rem', color: knownHoliday.category === 'jewish' ? '#7C3AED' : '#00B4D8', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '95px' }}>
                       🌴 {knownHoliday.name.split('—')[0].trim()}
                     </span>
@@ -258,9 +258,9 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
                   <button
                     type="button"
                     className="nav-btn"
-                    style={{ padding: '2px 4px', color: dayHoliday ? '#059669' : knownHoliday ? '#7C3AED' : 'var(--text-muted)' }}
+                    style={{ padding: '2px 4px', color: dayHoliday ? '#059669' : (knownHoliday && isTodayOrUpcoming(d.dateStr)) ? '#7C3AED' : 'var(--text-muted)' }}
                     onClick={() => setHolidayModalTargetDate(d.dateStr)}
-                    title={dayHoliday ? `Holiday: ${dayHoliday.name}` : knownHoliday ? `Suggested: ${knownHoliday.name}` : 'Mark as holiday / day off'}
+                    title={dayHoliday ? `Holiday: ${dayHoliday.name}` : (knownHoliday && isTodayOrUpcoming(d.dateStr)) ? `Suggested: ${knownHoliday.name}` : 'Mark as holiday / day off'}
                   >
                     <Palmtree size={14} />
                   </button>

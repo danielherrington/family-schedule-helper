@@ -11,6 +11,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { isTodayOrUpcoming } from '../utils/dateUtils';
 import { Modal } from './ui/Modal';
 import { SegmentedTabs, TabItem } from './ui/SegmentedTabs';
 
@@ -74,7 +75,7 @@ export const SundayAlertModal: React.FC = () => {
   const weekStartStr = format(currentWeekDays[0], 'MMM d');
   const weekEndStr = format(currentWeekDays[6], 'MMM d, yyyy');
   const weekHolidays = holidays.filter((h) => 
-    currentWeekDays.some((d) => format(d, 'yyyy-MM-dd') === h.date)
+    currentWeekDays.some((d) => format(d, 'yyyy-MM-dd') === h.date) && isTodayOrUpcoming(h.date)
   );
 
   const tabs: TabItem[] = [
