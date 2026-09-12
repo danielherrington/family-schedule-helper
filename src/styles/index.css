@@ -1414,3 +1414,33 @@ button, input, select {
     padding: 1px 5px !important;
   }
 }
+
+/* Neon Pink Long-Haired Dachshund (Moe) Styling */
+.is-moe-card {
+  border-left: 4px solid #FF2A85 !important;
+  background: linear-gradient(135deg, rgba(255, 42, 133, 0.04) 0%, rgba(255, 255, 255, 1) 35%) !important;
+  box-shadow: 0 2px 10px rgba(255, 42, 133, 0.12), var(--shadow-sm) !important;
+  transition: all 0.2s ease !important;
+}
+
+.is-moe-card:hover {
+  box-shadow: 0 4px 16px rgba(255, 42, 133, 0.22), var(--shadow-md) !important;
+  transform: translateY(-1px);
+}
+
+.moe-doxie-badge {
+  background: rgba(255, 42, 133, 0.14) !important;
+  color: #FF2A85 !important;
+  border: 1px solid rgba(255, 42, 133, 0.45) !important;
+  box-shadow: 0 0 8px rgba(255, 42, 133, 0.2) !important;
+}
+
+.moe-walkies-badge {
+  background: linear-gradient(135deg, rgba(255, 42, 133, 0.15) 0%, rgba(255, 20, 147, 0.1) 100%) !important;
+  color: #FF2A85 !important;
+  border: 1px solid rgba(255, 42, 133, 0.4) !important;
+  font-weight: 700 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+}

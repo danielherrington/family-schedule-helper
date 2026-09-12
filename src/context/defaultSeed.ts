@@ -59,10 +59,10 @@ export const DEFAULT_CHILDREN: Child[] = [
   {
     id: 'moe',
     name: 'Moe 🐕',
-    color: '#D97706', // Golden Amber
-    badgeBg: 'rgba(217, 119, 6, 0.12)',
-    badgeBorder: 'rgba(217, 119, 6, 0.35)',
-    school: 'Family Dog'
+    color: '#FF2A85', // Electric Neon Pink
+    badgeBg: 'rgba(255, 42, 133, 0.15)',
+    badgeBorder: 'rgba(255, 42, 133, 0.45)',
+    school: 'Long-Haired Dachshund 🐾'
   }
 ];
 

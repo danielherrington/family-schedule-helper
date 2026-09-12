@@ -16,6 +16,7 @@ import {
   Trash2,
   Plane
 } from 'lucide-react';
+import { DachshundIcon } from './ui/DachshundIcon';
 
 interface EventCardProps {
   event: DispatchEvent;
@@ -38,10 +39,11 @@ export const EventCard: React.FC<EventCardProps> = ({ event }) => {
   const [cancelReason, setCancelReason] = useState('No Class / Holiday');
   const [noPickupReason, setNoPickupReason] = useState('Playdate / With Friend');
 
+  const isMoe = event.childId === 'moe' || event.title.toLowerCase().includes('moe');
   const child = childrenList.find((c) => c.id === event.childId);
-  const childColor = child?.color || '#3b82f6';
-  const childBg = child?.badgeBg || 'rgba(59, 130, 246, 0.12)';
-  const childBorder = child?.badgeBorder || 'rgba(59, 130, 246, 0.35)';
+  const childColor = isMoe ? '#FF2A85' : (child?.color || '#3b82f6');
+  const childBg = isMoe ? 'rgba(255, 42, 133, 0.14)' : (child?.badgeBg || 'rgba(59, 130, 246, 0.12)');
+  const childBorder = isMoe ? 'rgba(255, 42, 133, 0.45)' : (child?.badgeBorder || 'rgba(59, 130, 246, 0.35)');
 
   const isCancelled = event.status === 'cancelled';
   const isNoPickupNeeded = event.status === 'no_pickup_needed';
@@ -84,7 +86,14 @@ export const EventCard: React.FC<EventCardProps> = ({ event }) => {
                 color: 'var(--text-muted)'
               }}
             >
-              {child?.name || event.childId}
+              {isMoe ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <DachshundIcon size={13} color="var(--text-muted)" />
+                  <span>Moe 🐾</span>
+                </span>
+              ) : (
+                child?.name || event.childId
+              )}
             </span>
             <span className="time-chip" style={{ textDecoration: 'line-through', opacity: 0.6 }}>
               {event.startTime} - {event.endTime}
@@ -136,14 +145,21 @@ export const EventCard: React.FC<EventCardProps> = ({ event }) => {
         <div className="event-meta-row">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span 
-              className="child-badge"
+              className={`child-badge ${isMoe ? 'moe-doxie-badge' : ''}`}
               style={{
                 backgroundColor: childBg,
                 borderColor: childBorder,
                 color: childColor
               }}
             >
-              {child?.name || event.childId}
+              {isMoe ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <DachshundIcon size={14} color="#FF2A85" />
+                  <span>Moe 🐕</span>
+                </span>
+              ) : (
+                child?.name || event.childId
+              )}
             </span>
             <span className="time-chip" style={{ opacity: 0.85 }}>
               <Clock size={12} style={{ display: 'inline', marginRight: '3px', verticalAlign: '-1px' }} />
@@ -218,19 +234,26 @@ export const EventCard: React.FC<EventCardProps> = ({ event }) => {
 
   // 3. Normal Active Event View
   return (
-    <div className={`event-card-mobile ${event.isException ? 'is-exception' : ''}`}>
+    <div className={`event-card-mobile ${event.isException ? 'is-exception' : ''} ${isMoe ? 'is-moe-card' : ''}`}>
       {/* Top Meta Row */}
       <div className="event-meta-row">
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span 
-            className="child-badge"
+            className={`child-badge ${isMoe ? 'moe-doxie-badge' : ''}`}
             style={{
               backgroundColor: childBg,
               borderColor: childBorder,
               color: childColor
             }}
           >
-            {child?.name || (event.childId === 'all' ? 'All Kids' : event.childId)}
+            {isMoe ? (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <DachshundIcon size={14} color="#FF2A85" />
+                <span>Moe 🐕</span>
+              </span>
+            ) : (
+              child?.name || (event.childId === 'all' ? 'All Kids' : event.childId)
+            )}
           </span>
           <span className="time-chip">
             <Clock size={12} style={{ display: 'inline', marginRight: '3px', verticalAlign: '-1px' }} />
@@ -261,6 +284,11 @@ export const EventCard: React.FC<EventCardProps> = ({ event }) => {
             <span className="status-badge unassigned">
               <AlertCircle size={12} />
               <span>Unassigned</span>
+            </span>
+          ) : isMoe ? (
+            <span className="status-badge moe-walkies-badge" title="Moe's Long-Haired Dachshund Walk Routine">
+              <DachshundIcon size={12} color="#FF2A85" />
+              <span>Doxie Walkies</span>
             </span>
           ) : (
             <span className="status-badge routine">

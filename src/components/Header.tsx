@@ -20,6 +20,7 @@ import {
 
 import { isTodayOrUpcoming, getTodayDateStr } from '../utils/dateUtils';
 import { isStaging } from '../services/firebaseClient';
+import { DachshundIcon } from './ui/DachshundIcon';
 
 export const Header: React.FC = () => {
   const { 
@@ -81,6 +82,27 @@ export const Header: React.FC = () => {
               <div className="brand-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span>Los Herringtons</span>
                 <span className="brand-badge">🌴 Miami</span>
+                <span 
+                  className="doxie-mascot-pill"
+                  title="Moe the Long-Haired Dachshund 🐾"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    background: 'linear-gradient(135deg, rgba(255, 42, 133, 0.16) 0%, rgba(255, 110, 199, 0.08) 100%)',
+                    border: '1px solid rgba(255, 42, 133, 0.45)',
+                    color: '#FF2A85',
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    boxShadow: '0 0 10px rgba(255, 42, 133, 0.25)',
+                    cursor: 'default'
+                  }}
+                >
+                  <DachshundIcon size={14} color="#FF2A85" glow />
+                  <span>Moe 🐾</span>
+                </span>
                 {isStaging && (
                   <a
                     href="https://family-schedule-helper.web.app"

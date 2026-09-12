@@ -730,7 +730,23 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           setChildrenList(mergedChildren);
           saveSharedKids(mergedChildren);
         } else {
-          setChildrenList(data.children);
+          // Auto-upgrade Moe to neon pink if using old amber
+          const upgraded = data.children.map((c) => {
+            if (c.id === 'moe' && (c.color === '#D97706' || c.school === 'Family Dog')) {
+              return {
+                ...c,
+                color: '#FF2A85',
+                badgeBg: 'rgba(255, 42, 133, 0.15)',
+                badgeBorder: 'rgba(255, 42, 133, 0.45)',
+                school: 'Long-Haired Dachshund 🐾'
+              };
+            }
+            return c;
+          });
+          setChildrenList(upgraded);
+          if (upgraded.some((c, i) => c.color !== data.children![i]?.color)) {
+            saveSharedKids(upgraded);
+          }
         }
       } else if (!data.children || data.children.length === 0) {
         saveSharedKids(DEFAULT_CHILDREN);

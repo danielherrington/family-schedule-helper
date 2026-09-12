@@ -15,6 +15,7 @@ import {
 import { format } from 'date-fns';
 import { isTodayOrUpcoming } from '../utils/dateUtils';
 import { getEventShift, ShiftCategory, SHIFT_CONFIGS } from '../utils/shiftUtils';
+import { DachshundIcon } from './ui/DachshundIcon';
 
 export const WeeklyMatrixView: React.FC = () => {
   const { 
@@ -59,6 +60,7 @@ export const WeeklyMatrixView: React.FC = () => {
             </button>
             {childrenList.map((ch) => {
               const isSelected = selectedChildFilter === ch.id;
+              const isMoe = ch.id === 'moe';
               return (
                 <button
                   key={ch.id}
@@ -66,13 +68,18 @@ export const WeeklyMatrixView: React.FC = () => {
                   style={{
                     padding: '5px 12px',
                     fontSize: '0.82rem',
-                    borderColor: isSelected ? ch.color : undefined,
-                    background: isSelected ? ch.color : undefined,
-                    color: isSelected ? '#fff' : undefined
+                    borderColor: isSelected ? ch.color : isMoe ? 'rgba(255, 42, 133, 0.45)' : undefined,
+                    background: isSelected ? ch.color : isMoe ? 'rgba(255, 42, 133, 0.08)' : undefined,
+                    color: isSelected ? '#fff' : isMoe ? '#FF2A85' : undefined,
+                    boxShadow: isMoe && isSelected ? '0 0 10px rgba(255, 42, 133, 0.45)' : undefined,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px'
                   }}
                   onClick={() => setSelectedChildFilter(ch.id)}
                 >
-                  {ch.name}
+                  {isMoe && <DachshundIcon size={13} color={isSelected ? '#fff' : '#FF2A85'} />}
+                  <span>{ch.name}</span>
                 </button>
               );
             })}
