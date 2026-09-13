@@ -120,9 +120,9 @@ export const CalendarSettingsModal: React.FC = () => {
                 <button
                   type="button"
                   className="btn btn-secondary"
-                  onClick={() => autoDetectCalendarMappings()}
+                  onClick={() => autoDetectCalendarMappings(undefined, true)}
                   style={{ fontSize: '0.78rem', padding: '4px 10px', gap: '5px' }}
-                  title="Auto-detect calendars for Daniel, Lucila, Elizabeth, Matilda, and Shared"
+                  title="Auto-detect calendars for Daniel, Lucila, Elizabeth, Matilda, and Shared (prioritizes 'Family - [Name]')"
                 >
                   <Sparkles size={13} color="var(--primary)" />
                   <span>Auto-Detect Mappings</span>

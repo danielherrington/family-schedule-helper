@@ -71,7 +71,7 @@ interface ScheduleContextType {
   cloudSyncActive: boolean;
   caregiverCalendarMappings: Record<string, { calendarId: string; calendarName: string }>;
   setCaregiverCalendarMapping: (caregiverId: string, calendarId: string, calendarName: string) => void;
-  autoDetectCalendarMappings: (availableCals?: import('../services/googleCalendarClient').GCalUserCalendar[]) => void;
+  autoDetectCalendarMappings: (availableCals?: import('../services/googleCalendarClient').GCalUserCalendar[], force?: boolean) => void;
   
   // Actions
   setSelectedDate: (date: string) => void;
@@ -319,7 +319,17 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   >(() => {
     try {
       const saved = localStorage.getItem('gcal_caregiver_calendar_map');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Automatically sanitize if Lucila was erroneously mapped to "With Lucila"
+        if (
+          parsed['lucila']?.calendarName?.toLowerCase().includes('with lucila') ||
+          parsed['lucila']?.calendarName?.toLowerCase().startsWith('with ')
+        ) {
+          delete parsed['lucila'];
+        }
+        return parsed;
+      }
     } catch {}
     return {};
   });
@@ -339,43 +349,122 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     addToast(`Mapped ${caregiverId} to calendar "${calendarName}"`, 'info');
   };
 
-  const autoDetectCalendarMappings = (availableCals: GCalUserCalendar[] = userCalendars) => {
+  const autoDetectCalendarMappings = (
+    availableCals: GCalUserCalendar[] = userCalendars,
+    force: boolean = false
+  ) => {
     if (!availableCals || availableCals.length === 0) return;
 
     setCaregiverCalendarMappings((prev) => {
       const next = { ...prev };
       let updated = false;
 
-      const danielCal = availableCals.find((c) => c.summary.toLowerCase().includes('daniel'));
-      if (danielCal && (!next['daniel'] || next['daniel'].calendarId !== danielCal.id)) {
-        next['daniel'] = { calendarId: danielCal.id, calendarName: danielCal.summary };
-        updated = true;
+      // Smart finder function prioritizing "Family - <Name>" over generic/meeting calendars like "With Lucila"
+      const findBest = (targetId: string, name: string): GCalUserCalendar | undefined => {
+        const lowerName = name.toLowerCase().split(' ')[0]; // 'lucila', 'daniel', etc.
+        const idLower = targetId.toLowerCase();
+
+        // Priority 1: Exact match for "Family - <Name>" or "Family - <Id>"
+        const exact = availableCals.find((c) => {
+          const s = c.summary.trim().toLowerCase();
+          if (s === `family - ${lowerName}` || s === `family - ${idLower}`) return true;
+          if (idLower === 'matilda' && (s === 'family - matilde' || s === 'family - abu')) return true;
+          return false;
+        });
+        if (exact) return exact;
+
+        // Priority 2: Starts with "Family" and contains the caregiver name
+        const prefixFamily = availableCals.find((c) => {
+          const s = c.summary.trim().toLowerCase();
+          if (!s.startsWith('family')) return false;
+          if (s.includes(lowerName) || s.includes(idLower)) return true;
+          if (idLower === 'matilda' && (s.includes('matild') || s.includes('abu'))) return true;
+          return false;
+        });
+        if (prefixFamily) return prefixFamily;
+
+        // Priority 3: Contains caregiver name, but explicitly EXCLUDES "with <name>" (1-on-1 meeting calendars)
+        const nonWith = availableCals.find((c) => {
+          const s = c.summary.trim().toLowerCase();
+          if (s.startsWith('with ') || s.includes(`with ${lowerName}`)) return false;
+          if (s.includes(lowerName) || s.includes(idLower)) return true;
+          if (idLower === 'matilda' && (s.includes('matild') || s.includes('abu'))) return true;
+          return false;
+        });
+        if (nonWith) return nonWith;
+
+        // Priority 4: Any non-primary calendar matching the name
+        const nonPrimary = availableCals.find((c) => {
+          if (c.primary) return false;
+          const s = c.summary.trim().toLowerCase();
+          return s.includes(lowerName) || s.includes(idLower);
+        });
+        if (nonPrimary) return nonPrimary;
+
+        // Priority 5: Fallback to any calendar matching name
+        return availableCals.find((c) => {
+          const s = c.summary.trim().toLowerCase();
+          if (s.includes(lowerName) || s.includes(idLower)) return true;
+          if (idLower === 'matilda' && (s.includes('matild') || s.includes('abu'))) return true;
+          return false;
+        });
+      };
+
+      const findShared = (): GCalUserCalendar | undefined => {
+        // Priority 1: Exact match for "Family - Shared"
+        const exact = availableCals.find((c) => c.summary.trim().toLowerCase() === 'family - shared');
+        if (exact) return exact;
+
+        // Priority 2: Contains both "family" and "shared"
+        const familyShared = availableCals.find((c) => {
+          const s = c.summary.trim().toLowerCase();
+          return s.includes('family') && s.includes('shared');
+        });
+        if (familyShared) return familyShared;
+
+        // Priority 3: Starts with "Family"
+        const familyPrefix = availableCals.find((c) => c.summary.trim().toLowerCase().startsWith('family'));
+        if (familyPrefix) return familyPrefix;
+
+        // Priority 4: Contains "shared"
+        return availableCals.find((c) => c.summary.trim().toLowerCase().includes('shared'));
+      };
+
+      // Check each configured caregiver
+      for (const cg of caregivers) {
+        const currentMapping = next[cg.id];
+        const currentCalExists = currentMapping?.calendarId
+          ? availableCals.some((c) => c.id === currentMapping.calendarId)
+          : false;
+
+        // Catch the known bug pattern where Lucila was incorrectly defaulting to "With Lucila"
+        const isWithPatternBug = cg.id === 'lucila' && (
+          currentMapping?.calendarName?.toLowerCase().includes('with lucila') ||
+          currentMapping?.calendarName?.toLowerCase().startsWith('with ')
+        );
+
+        // Update if forced, unmapped, calendar ID doesn't exist, or has the "With Lucila" bug
+        if (force || !currentMapping?.calendarId || !currentCalExists || isWithPatternBug) {
+          const best = findBest(cg.id, cg.name);
+          if (best && (!currentMapping || currentMapping.calendarId !== best.id)) {
+            next[cg.id] = { calendarId: best.id, calendarName: best.summary };
+            updated = true;
+          }
+        }
       }
 
-      const lucilaCal = availableCals.find((c) => c.summary.toLowerCase().includes('lucila'));
-      if (lucilaCal && (!next['lucila'] || next['lucila'].calendarId !== lucilaCal.id)) {
-        next['lucila'] = { calendarId: lucilaCal.id, calendarName: lucilaCal.summary };
-        updated = true;
-      }
+      // Check shared / general routine calendar
+      const currentShared = next['shared'];
+      const sharedExists = currentShared?.calendarId
+        ? availableCals.some((c) => c.id === currentShared.calendarId)
+        : false;
 
-      const elizabethCal = availableCals.find((c) => c.summary.toLowerCase().includes('elizabeth'));
-      if (elizabethCal && (!next['elizabeth'] || next['elizabeth'].calendarId !== elizabethCal.id)) {
-        next['elizabeth'] = { calendarId: elizabethCal.id, calendarName: elizabethCal.summary };
-        updated = true;
-      }
-
-      const matildaCal = availableCals.find((c) => 
-        c.summary.toLowerCase().includes('matild') || c.summary.toLowerCase().includes('abu')
-      );
-      if (matildaCal && (!next['matilda'] || next['matilda'].calendarId !== matildaCal.id)) {
-        next['matilda'] = { calendarId: matildaCal.id, calendarName: matildaCal.summary };
-        updated = true;
-      }
-
-      const sharedCal = availableCals.find((c) => c.summary.toLowerCase().includes('shared'));
-      if (sharedCal && (!next['shared'] || next['shared'].calendarId !== sharedCal.id)) {
-        next['shared'] = { calendarId: sharedCal.id, calendarName: sharedCal.summary };
-        updated = true;
+      if (force || !currentShared?.calendarId || !sharedExists) {
+        const bestShared = findShared();
+        if (bestShared && (!currentShared || currentShared.calendarId !== bestShared.id)) {
+          next['shared'] = { calendarId: bestShared.id, calendarName: bestShared.summary };
+          updated = true;
+        }
       }
 
       if (updated) {
@@ -383,7 +472,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           localStorage.setItem('gcal_caregiver_calendar_map', JSON.stringify(next));
         } catch {}
         saveSharedCalendarMappings(next);
-        addToast('Auto-detected and mapped family Google Calendars!', 'success');
+        addToast('Auto-detected and routed family Google Calendars (prioritizing "Family - [Name]")!', 'success');
       }
       return next;
     });
@@ -773,10 +862,23 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
 
       if (data.calendarMappings && Object.keys(data.calendarMappings).length > 0) {
-        setCaregiverCalendarMappings(data.calendarMappings);
-        try {
-          localStorage.setItem('gcal_caregiver_calendar_map', JSON.stringify(data.calendarMappings));
-        } catch {}
+        const cleaned = { ...data.calendarMappings };
+        if (
+          cleaned['lucila']?.calendarName?.toLowerCase().includes('with lucila') ||
+          cleaned['lucila']?.calendarName?.toLowerCase().startsWith('with ')
+        ) {
+          delete cleaned['lucila'];
+        }
+        setCaregiverCalendarMappings((prev) => {
+          const next = { ...prev, ...cleaned };
+          if (!next['lucila'] && prev['lucila']?.calendarName?.toLowerCase().includes('family - lucila')) {
+            next['lucila'] = prev['lucila'];
+          }
+          try {
+            localStorage.setItem('gcal_caregiver_calendar_map', JSON.stringify(next));
+          } catch {}
+          return next;
+        });
       }
 
       if (data.travels && Array.isArray(data.travels)) {
