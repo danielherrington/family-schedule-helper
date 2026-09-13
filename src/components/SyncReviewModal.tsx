@@ -192,6 +192,27 @@ export const SyncReviewModal: React.FC = () => {
             </span>
           </div>
 
+          {pendingSyncQueue.some((item) => item.eventId.startsWith('evt-')) && (
+            <div
+              style={{
+                background: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid rgba(239, 68, 68, 0.35)',
+                borderRadius: '8px',
+                padding: '10px 14px',
+                fontSize: '0.82rem',
+                color: '#b91c1c',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '8px'
+              }}
+            >
+              <AlertTriangle size={18} color="#ef4444" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <div>
+                <strong>⚠️ Local Blueprint Placeholder Detected:</strong> One or more staged changes target a blueprint template that has not been linked to a real Google Calendar invite ID yet. To avoid creating new duplicate events, ensure you connect Google Calendar and click <strong>"Refresh Calendar Events"</strong> in Settings so existing calendar invites are recognized.
+              </div>
+            </div>
+          )}
+
           {pendingSyncQueue.map((item) => {
             const isReassign = item.type === 'reassign';
             const isNoPickup = item.type === 'no_pickup';

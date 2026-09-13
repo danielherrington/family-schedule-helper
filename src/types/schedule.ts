@@ -43,6 +43,7 @@ export interface DispatchEvent {
   isHoliday?: boolean;
   hasConflict?: boolean;
   travelCoveringFor?: CaregiverId;
+  isGCalLinked?: boolean;
 }
 
 export interface CaregiverTravel {
@@ -116,4 +117,16 @@ export interface StagedSyncItem {
   targetCalendarName?: string;
   payload: any;
   timestamp: number;
+}
+
+export interface SyncLogEntry {
+  id: string;
+  timestamp: string; // ISO string
+  action: 'connect' | 'list_calendars' | 'fetch_events' | 'patch_assignment' | 'move_event' | 'no_pickup' | 'create_event' | 'delete_event' | 'error';
+  status: 'success' | 'error' | 'warning' | 'info';
+  statusCode?: number;
+  summary: string;
+  details?: string;
+  calendarId?: string;
+  eventId?: string;
 }

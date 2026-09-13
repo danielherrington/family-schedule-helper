@@ -4,7 +4,7 @@
  * Enables live Google Calendar read/write without requiring a dedicated backend server.
  */
 
-import { DispatchEvent, Caregiver, Child, EventTemplate } from '../types/schedule';
+import { DispatchEvent, Caregiver, Child, EventTemplate, SyncLogEntry } from '../types/schedule';
 
 declare const google: any;
 
@@ -25,9 +25,48 @@ const STORAGE_KEY_TOKEN = 'gcal_access_token';
 const STORAGE_KEY_EXPIRES = 'gcal_token_expires_at';
 const STORAGE_KEY_CALENDAR_ID = 'gcal_active_calendar_id';
 const STORAGE_KEY_ACCOUNT = 'gcal_connected_email';
+const STORAGE_KEY_SYNC_LOGS = 'gcal_sync_logs_v1';
 
 export class GoogleCalendarService {
   private static tokenClient: any = null;
+
+  public static getSyncLogs(): SyncLogEntry[] {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_SYNC_LOGS);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  public static addSyncLog(entry: Omit<SyncLogEntry, 'id' | 'timestamp'>) {
+    try {
+      const logs = this.getSyncLogs();
+      const newEntry: SyncLogEntry = {
+        id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        timestamp: new Date().toISOString(),
+        ...entry
+      };
+      const updated = [newEntry, ...logs].slice(0, 100);
+      localStorage.setItem(STORAGE_KEY_SYNC_LOGS, JSON.stringify(updated));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('gcal_sync_log_added', { detail: newEntry }));
+      }
+    } catch (e) {
+      console.warn('Failed to record sync log:', e);
+    }
+  }
+
+  public static clearSyncLogs() {
+    try {
+      localStorage.removeItem(STORAGE_KEY_SYNC_LOGS);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('gcal_sync_log_added'));
+      }
+    } catch (e) {}
+  }
 
   public static isGisLoaded(): boolean {
     return typeof google !== 'undefined' && !!google.accounts && !!google.accounts.oauth2;
@@ -65,6 +104,12 @@ export class GoogleCalendarService {
   }
 
   public static disconnect() {
+    this.addSyncLog({
+      action: 'connect',
+      status: 'info',
+      summary: 'Google Calendar disconnected',
+      details: 'Cleared local OAuth credentials.'
+    });
     localStorage.removeItem(STORAGE_KEY_TOKEN);
     localStorage.removeItem(STORAGE_KEY_EXPIRES);
     localStorage.removeItem(STORAGE_KEY_ACCOUNT);
@@ -88,6 +133,12 @@ export class GoogleCalendarService {
         },
         callback: async (response: any) => {
           if (response.error) {
+            this.addSyncLog({
+              action: 'connect',
+              status: 'error',
+              summary: 'Google OAuth Sign-In Failed',
+              details: response.error_description || response.error
+            });
             reject(new Error(response.error_description || response.error));
             return;
           }
@@ -98,6 +149,7 @@ export class GoogleCalendarService {
           localStorage.setItem(STORAGE_KEY_TOKEN, accessToken);
           localStorage.setItem(STORAGE_KEY_EXPIRES, expiresAt.toString());
 
+          let userEmail = '';
           // Try fetching user email
           try {
             const userRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
@@ -106,10 +158,18 @@ export class GoogleCalendarService {
             if (userRes.ok) {
               const userData = await userRes.json();
               if (userData.email) {
+                userEmail = userData.email;
                 this.setConnectedEmail(userData.email);
               }
             }
           } catch (e) {}
+
+          this.addSyncLog({
+            action: 'connect',
+            status: 'success',
+            summary: `Google Account Connected (${userEmail || 'OAuth Token Granted'})`,
+            details: `OAuth token stored. Scopes: calendar.events, calendar.readonly. Expires in ${expiresInSeconds}s.`
+          });
 
           resolve(accessToken);
         }
@@ -131,12 +191,28 @@ export class GoogleCalendarService {
     });
 
     if (!res.ok) {
+      this.addSyncLog({
+        action: 'list_calendars',
+        status: 'error',
+        statusCode: res.status,
+        summary: `Failed to list calendars (HTTP ${res.status})`,
+        details: res.status === 401 ? 'Authentication expired.' : 'Could not query Google Calendar list.'
+      });
       if (res.status === 401) this.disconnect();
       throw new Error(`Failed to list calendars (${res.status})`);
     }
 
     const data = await res.json();
-    return (data.items || []).map((cal: any) => ({
+    const items = data.items || [];
+    this.addSyncLog({
+      action: 'list_calendars',
+      status: 'success',
+      statusCode: res.status,
+      summary: `Discovered ${items.length} Google Calendars`,
+      details: items.map((c: any) => c.summary || c.id).join(', ')
+    });
+
+    return items.map((cal: any) => ({
       id: cal.id,
       summary: cal.summary || 'Untitled Calendar',
       description: cal.description,
@@ -172,12 +248,29 @@ export class GoogleCalendarService {
     });
 
     if (!res.ok) {
+      this.addSyncLog({
+        action: 'fetch_events',
+        status: 'error',
+        statusCode: res.status,
+        summary: `Failed to fetch events from "${calendarId}" (HTTP ${res.status})`,
+        details: res.status === 401 ? 'Google OAuth token expired. Please re-authenticate in Settings.' : `API error status ${res.status}.`,
+        calendarId
+      });
       if (res.status === 401) this.disconnect();
       throw new Error(`Failed to fetch events from Google Calendar (${res.status})`);
     }
 
     const data = await res.json();
-    return data.items || [];
+    const items = data.items || [];
+    this.addSyncLog({
+      action: 'fetch_events',
+      status: 'success',
+      statusCode: res.status,
+      summary: `Read ${items.length} events from calendar "${calendarId}"`,
+      details: `Range: ${mondayDateStr} to ${sundayDateStr}. Expanded repeating instances in place.`,
+      calendarId
+    });
+    return items;
   }
 
   /**
@@ -434,7 +527,8 @@ export class GoogleCalendarService {
       notes: gcalEvent.description,
       sourceCalendarId,
       status,
-      cancellationReason
+      cancellationReason,
+      isGCalLinked: true
     };
   }
 
@@ -446,9 +540,34 @@ export class GoogleCalendarService {
     eventId: string,
     currentEvent: DispatchEvent,
     newCaregiver: Caregiver | null
-  ): Promise<boolean> {
+  ): Promise<{ success: boolean; status?: number; error?: string }> {
     const token = this.getStoredToken();
-    if (!token) return false;
+    if (!token) {
+      const err = 'Google Calendar is not connected. Please connect in Settings.';
+      this.addSyncLog({
+        action: 'patch_assignment',
+        status: 'error',
+        summary: `Cannot update "${currentEvent.title}": Not connected`,
+        details: err,
+        calendarId,
+        eventId
+      });
+      return { success: false, error: err };
+    }
+
+    if (eventId.startsWith('evt-')) {
+      const err = `Event "${currentEvent.title}" is a local Blueprint placeholder (${eventId}) and does not exist in Google Calendar yet. Reconcile or connect your calendar to edit real invites in place.`;
+      this.addSyncLog({
+        action: 'patch_assignment',
+        status: 'error',
+        statusCode: 400,
+        summary: `Blocked update: "${currentEvent.title}" is a local placeholder`,
+        details: err,
+        calendarId,
+        eventId
+      });
+      return { success: false, status: 400, error: err };
+    }
 
     const newDriverTag = newCaregiver ? `[${newCaregiver.name.split(' ')[0]}]` : '[Unassigned]';
     const cleanTitle = currentEvent.title.replace(/\[.*?\]/g, '').trim();
@@ -463,19 +582,56 @@ export class GoogleCalendarService {
       patchBody.attendees = [{ email: newCaregiver.calendarId, responseStatus: 'accepted' }];
     }
 
-    const res = await fetch(
-      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
-      {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(patchBody)
-      }
-    );
+    try {
+      const res = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
+        {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(patchBody)
+        }
+      );
 
-    return res.ok;
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        const errMsg = errJson?.error?.message || `HTTP ${res.status}: ${res.statusText}`;
+        this.addSyncLog({
+          action: 'patch_assignment',
+          status: 'error',
+          statusCode: res.status,
+          summary: `Failed to update "${currentEvent.title}" (HTTP ${res.status})`,
+          details: errMsg,
+          calendarId,
+          eventId
+        });
+        return { success: false, status: res.status, error: errMsg };
+      }
+
+      this.addSyncLog({
+        action: 'patch_assignment',
+        status: 'success',
+        statusCode: res.status,
+        summary: `Updated "${currentEvent.title}" ➔ ${newCaregiver ? newCaregiver.name : 'Unassigned'}`,
+        details: `Modified existing Google Calendar invite "${updatedSummary}" in place without duplicating.`,
+        calendarId,
+        eventId
+      });
+      return { success: true, status: res.status };
+    } catch (netErr: any) {
+      const errMsg = netErr?.message || 'Network request failed';
+      this.addSyncLog({
+        action: 'patch_assignment',
+        status: 'error',
+        summary: `Network error updating "${currentEvent.title}"`,
+        details: errMsg,
+        calendarId,
+        eventId
+      });
+      return { success: false, error: errMsg };
+    }
   }
 
   /**
@@ -486,29 +642,74 @@ export class GoogleCalendarService {
     eventId: string,
     currentEvent: DispatchEvent,
     reason: string
-  ): Promise<boolean> {
+  ): Promise<{ success: boolean; status?: number; error?: string }> {
     const token = this.getStoredToken();
-    if (!token) return false;
+    if (!token) {
+      const err = 'Google Calendar is not connected.';
+      return { success: false, error: err };
+    }
+
+    if (eventId.startsWith('evt-')) {
+      const err = `Event "${currentEvent.title}" is a local Blueprint placeholder and does not exist in Google Calendar yet.`;
+      this.addSyncLog({
+        action: 'no_pickup',
+        status: 'error',
+        statusCode: 400,
+        summary: `Cannot update "${currentEvent.title}": Local placeholder`,
+        details: err,
+        calendarId,
+        eventId
+      });
+      return { success: false, status: 400, error: err };
+    }
 
     const cleanTitle = currentEvent.title.replace(/\[.*?\]/g, '').trim();
     const updatedSummary = `[No Pickup] ${cleanTitle}`;
 
-    const res = await fetch(
-      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
-      {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          summary: updatedSummary,
-          description: `${currentEvent.notes || ''}\n\nNo Pickup Needed: ${reason} (via Schedule Helper)`
-        })
-      }
-    );
+    try {
+      const res = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
+        {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            summary: updatedSummary,
+            description: `${currentEvent.notes || ''}\n\nNo Pickup Needed: ${reason} (via Schedule Helper)`
+          })
+        }
+      );
 
-    return res.ok;
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        const errMsg = errJson?.error?.message || `HTTP ${res.status}: ${res.statusText}`;
+        this.addSyncLog({
+          action: 'no_pickup',
+          status: 'error',
+          statusCode: res.status,
+          summary: `Failed to mark No Pickup on "${currentEvent.title}"`,
+          details: errMsg,
+          calendarId,
+          eventId
+        });
+        return { success: false, status: res.status, error: errMsg };
+      }
+
+      this.addSyncLog({
+        action: 'no_pickup',
+        status: 'success',
+        statusCode: res.status,
+        summary: `Marked No Pickup: "${cleanTitle}" (${reason})`,
+        details: `Updated Google Calendar invite ${eventId}.`,
+        calendarId,
+        eventId
+      });
+      return { success: true, status: res.status };
+    } catch (netErr: any) {
+      return { success: false, error: netErr?.message || 'Network error' };
+    }
   }
 
   /**
@@ -553,9 +754,29 @@ export class GoogleCalendarService {
     );
 
     if (res.ok) {
-      return await res.json();
+      const created = await res.json();
+      this.addSyncLog({
+        action: 'create_event',
+        status: 'success',
+        statusCode: res.status,
+        summary: `Created new event "${summary}"`,
+        details: `Created in calendar "${calendarId}". Google Event ID: ${created.id}.`,
+        calendarId,
+        eventId: created.id
+      });
+      return created;
+    } else {
+      const err = await res.json().catch(() => ({}));
+      this.addSyncLog({
+        action: 'create_event',
+        status: 'error',
+        statusCode: res.status,
+        summary: `Failed to create "${summary}"`,
+        details: err?.error?.message || `HTTP ${res.status}`,
+        calendarId
+      });
+      return null;
     }
-    return null;
   }
 
   /**
@@ -568,6 +789,10 @@ export class GoogleCalendarService {
     const token = this.getStoredToken();
     if (!token) return false;
 
+    if (eventId.startsWith('evt-')) {
+      return true; // Local mock event
+    }
+
     const res = await fetch(
       `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
       {
@@ -576,7 +801,18 @@ export class GoogleCalendarService {
       }
     );
 
-    return res.ok || res.status === 404 || res.status === 410;
+    const ok = res.ok || res.status === 404 || res.status === 410;
+    this.addSyncLog({
+      action: 'delete_event',
+      status: ok ? 'success' : 'error',
+      statusCode: res.status,
+      summary: ok ? `Deleted Google Calendar event` : `Failed to delete Google Calendar event`,
+      details: `Calendar: ${calendarId}, Event ID: ${eventId}.`,
+      calendarId,
+      eventId
+    });
+
+    return ok;
   }
 
   /**
@@ -587,9 +823,23 @@ export class GoogleCalendarService {
     sourceCalendarId: string,
     eventId: string,
     destinationCalendarId: string
-  ): Promise<{ success: boolean; newEventId?: string }> {
+  ): Promise<{ success: boolean; newEventId?: string; error?: string }> {
     const token = this.getStoredToken();
-    if (!token) return { success: false };
+    if (!token) return { success: false, error: 'Google Calendar is not connected.' };
+
+    if (eventId.startsWith('evt-')) {
+      const err = `Cannot move local placeholder event (${eventId}) across Google Calendars.`;
+      this.addSyncLog({
+        action: 'move_event',
+        status: 'error',
+        statusCode: 400,
+        summary: `Move skipped: Local placeholder`,
+        details: err,
+        calendarId: sourceCalendarId,
+        eventId
+      });
+      return { success: false, error: err };
+    }
 
     if (!sourceCalendarId || !destinationCalendarId || sourceCalendarId === destinationCalendarId) {
       return { success: true, newEventId: eventId };
@@ -605,6 +855,15 @@ export class GoogleCalendarService {
 
       if (res.ok) {
         const moved = await res.json();
+        this.addSyncLog({
+          action: 'move_event',
+          status: 'success',
+          statusCode: res.status,
+          summary: `Moved event between calendars`,
+          details: `Transferred from ${sourceCalendarId} to ${destinationCalendarId}.`,
+          calendarId: destinationCalendarId,
+          eventId: moved.id
+        });
         return { success: true, newEventId: moved.id };
       }
 
@@ -654,10 +913,27 @@ export class GoogleCalendarService {
       // Cleanly delete from source calendar
       await this.deleteEvent(sourceCalendarId, eventId);
 
+      this.addSyncLog({
+        action: 'move_event',
+        status: 'success',
+        summary: `Transferred event across calendars (Copy & Delete)`,
+        details: `Recreated in ${destinationCalendarId}, removed from ${sourceCalendarId}.`,
+        calendarId: destinationCalendarId,
+        eventId: created.id
+      });
+
       return { success: true, newEventId: created.id };
-    } catch (err) {
+    } catch (err: any) {
+      this.addSyncLog({
+        action: 'move_event',
+        status: 'error',
+        summary: `Cross-calendar move failed`,
+        details: err?.message || 'Error occurred.',
+        calendarId: destinationCalendarId,
+        eventId
+      });
       console.error('Cross-calendar fallback move failed:', err);
-      return { success: false };
+      return { success: false, error: err?.message };
     }
   }
 
@@ -697,6 +973,13 @@ export class GoogleCalendarService {
         allEvents.push(...res.value);
       }
     }
+
+    this.addSyncLog({
+      action: 'fetch_events',
+      status: allEvents.length > 0 ? 'success' : 'info',
+      summary: `Dispatched ${allEvents.length} kid logistics events across ${calendarConfigs.length} Google Calendars`,
+      details: `Filtered & matched with family blueprints for week ${mondayDateStr} to ${sundayDateStr}.`
+    });
 
     return allEvents;
   }

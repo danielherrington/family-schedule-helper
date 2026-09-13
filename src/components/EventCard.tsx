@@ -14,7 +14,8 @@ import {
   UserX,
   Smile,
   Trash2,
-  Plane
+  Plane,
+  Calendar
 } from 'lucide-react';
 import { DachshundIcon } from './ui/DachshundIcon';
 
@@ -44,6 +45,7 @@ export const EventCard: React.FC<EventCardProps> = ({ event }) => {
   const childColor = isMoe ? '#FF2A85' : (child?.color || '#3b82f6');
   const childBg = isMoe ? 'rgba(255, 42, 133, 0.14)' : (child?.badgeBg || 'rgba(59, 130, 246, 0.12)');
   const childBorder = isMoe ? 'rgba(255, 42, 133, 0.45)' : (child?.badgeBorder || 'rgba(59, 130, 246, 0.35)');
+  const isGCalLinked = event.isGCalLinked ?? (!event.id.startsWith('evt-'));
 
   const isCancelled = event.status === 'cancelled';
   const isNoPickupNeeded = event.status === 'no_pickup_needed';
@@ -294,6 +296,47 @@ export const EventCard: React.FC<EventCardProps> = ({ event }) => {
             <span className="status-badge routine">
               <CheckCircle2 size={12} />
               <span>Routine</span>
+            </span>
+          )}
+
+          {/* Google Calendar Linkage Indicator Badge */}
+          {isGCalLinked ? (
+            <span 
+              className="status-badge"
+              style={{
+                background: 'rgba(16, 185, 129, 0.12)',
+                color: '#059669',
+                border: '1px solid rgba(16, 185, 129, 0.35)',
+                padding: '2px 6px',
+                fontSize: '0.68rem',
+                fontWeight: 800,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '3px'
+              }}
+              title={`Linked to Google Calendar invite (${event.id}). Reassigning modifies the existing invite in place without duplicates.`}
+            >
+              <Calendar size={10} />
+              <span>GCal Linked</span>
+            </span>
+          ) : (
+            <span 
+              className="status-badge"
+              style={{
+                background: 'rgba(245, 158, 11, 0.12)',
+                color: '#b45309',
+                border: '1px solid rgba(245, 158, 11, 0.35)',
+                padding: '2px 6px',
+                fontSize: '0.68rem',
+                fontWeight: 800,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '3px'
+              }}
+              title="Blueprint routine. Connect Google Calendar and click 'Refresh Calendar Events' in Settings to reconcile with your real calendar invites."
+            >
+              <Clock size={10} />
+              <span>Blueprint</span>
             </span>
           )}
 

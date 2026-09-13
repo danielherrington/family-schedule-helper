@@ -468,7 +468,8 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     setIsLoading(true);
     let successCount = 0;
-    const errors: string[] = [];
+    const errors: { summary: string; error: string }[] = [];
+    const successfulItemIds = new Set<string>();
 
     for (const item of pendingSyncQueue) {
       try {
@@ -479,44 +480,63 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           if (sourceCal && targetCal && sourceCal !== targetCal) {
             const moveRes = await GoogleCalendarService.moveEvent(sourceCal, item.eventId, targetCal);
             if (!moveRes.success) {
-              throw new Error(`Failed to move event from ${item.sourceCalendarName || sourceCal} to ${item.targetCalendarName || targetCal}`);
+              throw new Error(moveRes.error || `Failed to move event from ${item.sourceCalendarName || sourceCal} to ${item.targetCalendarName || targetCal}`);
             }
           } else {
             const currentEvt = events.find((e) => e.id === item.eventId) || item.payload.event;
             const targetCg = caregivers.find((c) => c.id === item.payload.targetCaregiverId) || null;
-            await GoogleCalendarService.patchEventAssignment(sourceCal || activeCalendarId, item.eventId, currentEvt, targetCg);
+            const patchRes = await GoogleCalendarService.patchEventAssignment(sourceCal || activeCalendarId, item.eventId, currentEvt, targetCg);
+            if (!patchRes.success) {
+              throw new Error(patchRes.error || `Google Calendar update failed (HTTP ${patchRes.status || 'unknown'})`);
+            }
           }
           successCount++;
+          successfulItemIds.add(item.id);
         } else if (item.type === 'no_pickup') {
           const cal = item.sourceCalendarId || item.payload?.sourceCalendarId || activeCalendarId;
           const currentEvt = events.find((e) => e.id === item.eventId) || item.payload.event;
-          await GoogleCalendarService.patchEventNoPickup(cal, item.eventId, currentEvt, item.payload.reason || 'No pickup needed');
+          const noPickupRes = await GoogleCalendarService.patchEventNoPickup(cal, item.eventId, currentEvt, item.payload.reason || 'No pickup needed');
+          if (!noPickupRes.success) {
+            throw new Error(noPickupRes.error || `Google Calendar update failed (HTTP ${noPickupRes.status || 'unknown'})`);
+          }
           successCount++;
+          successfulItemIds.add(item.id);
         } else if (item.type === 'create') {
           const targetCal = item.targetCalendarId || (item.payload?.createData?.assignedTo && caregiverCalendarMappings[item.payload.createData.assignedTo]?.calendarId) || caregiverCalendarMappings['shared']?.calendarId || activeCalendarId;
-          await GoogleCalendarService.createEvent(targetCal, item.payload.createData);
+          const created = await GoogleCalendarService.createEvent(targetCal, item.payload.createData);
+          if (!created) {
+            throw new Error('Google Calendar create event API returned an error.');
+          }
           successCount++;
+          successfulItemIds.add(item.id);
         } else if (item.type === 'delete') {
           const cal = item.sourceCalendarId || item.payload?.sourceCalendarId || activeCalendarId;
-          await GoogleCalendarService.deleteEvent(cal, item.eventId);
+          const ok = await GoogleCalendarService.deleteEvent(cal, item.eventId);
+          if (!ok) {
+            throw new Error('Google Calendar delete API returned an error.');
+          }
           successCount++;
+          successfulItemIds.add(item.id);
         }
       } catch (err: any) {
         console.error('Failed to sync item:', item, err);
-        errors.push(item.summary);
+        errors.push({ summary: item.summary, error: err?.message || 'Sync failed' });
       }
     }
 
-    updatePendingQueue(() => []);
+    // Keep items in the queue that failed so the user can inspect or retry them
+    updatePendingQueue((prev) => prev.filter((item) => !successfulItemIds.has(item.id)));
     await refreshCalendarEvents();
     setIsLoading(false);
-    setIsSyncReviewOpen(false);
+    if (errors.length === 0) {
+      setIsSyncReviewOpen(false);
+    }
 
     if (errors.length === 0) {
-      addToast(`Successfully pushed ${successCount} change${successCount === 1 ? '' : 's'} to Google Calendar!`, 'success');
+      addToast(`✓ Successfully pushed ${successCount} change${successCount === 1 ? '' : 's'} to Google Calendar!`, 'success');
       return { success: true, syncedCount: successCount };
     } else {
-      addToast(`Synced ${successCount} change(s). ${errors.length} failed.`, 'warning');
+      addToast(`⚠️ Synced ${successCount} change(s). ${errors.length} failed: ${errors[0].error}`, 'warning');
       return { success: false, syncedCount: successCount };
     }
   };
@@ -1690,7 +1710,15 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const applyWeeklyBlueprint = async (mondayDateStr: string = '2026-08-31') => {
     const monday = new Date(mondayDateStr + 'T12:00:00');
-    const generatedEvents: DispatchEvent[] = [];
+    const sundayDate = new Date(monday);
+    sundayDate.setDate(monday.getDate() + 6);
+    const sundayStr = sundayDate.toISOString().split('T')[0];
+
+    const weekEvents = events.filter((e) => e.date >= mondayDateStr && e.date <= sundayStr);
+    const matchedExistingEventIds = new Set<string>();
+    const reconciledEvents: DispatchEvent[] = [];
+    let reconciledCount = 0;
+    let templateGeneratedCount = 0;
 
     for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
       const currentDay = new Date(monday);
@@ -1716,33 +1744,73 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           eventNotes = eventNotes ? `${eventNotes} [Auto-routed: ${travelingName} out of town]` : `[Auto-routed: ${travelingName} out of town]`;
         }
 
-        generatedEvents.push({
-          id: `evt-${dateStr}-${tpl.id}`,
-          title: tpl.title,
-          childId: tpl.childId,
-          assignedTo: assignedCaregiver,
-          travelCoveringFor: coveringFor,
-          date: dateStr,
-          startTime: tpl.startTime,
-          endTime: tpl.endTime,
-          location: tpl.location,
-          category: tpl.category,
-          isRecurringMaster: true,
-          masterSeriesId: tpl.id,
-          notes: eventNotes,
-          status: assignedCaregiver === 'unassigned' ? 'unassigned' : 'confirmed'
+        // Check if an existing event already exists on this date that matches this template!
+        const existing = weekEvents.find((e) => {
+          if (e.date !== dateStr || matchedExistingEventIds.has(e.id)) return false;
+          if (e.masterSeriesId && e.masterSeriesId === tpl.id) return true;
+          if (e.childId === tpl.childId && e.category === tpl.category) return true;
+          const tplTitleClean = tpl.title.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const eTitleClean = e.title.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (tplTitleClean.includes(eTitleClean) || eTitleClean.includes(tplTitleClean)) return true;
+          return false;
         });
+
+        if (existing) {
+          // RECONCILE: Update the existing Google Calendar invite IN PLACE without creating a duplicate!
+          matchedExistingEventIds.add(existing.id);
+          reconciledCount++;
+          reconciledEvents.push({
+            ...existing,
+            assignedTo: assignedCaregiver,
+            travelCoveringFor: coveringFor,
+            notes: eventNotes || existing.notes,
+            status: assignedCaregiver === 'unassigned' ? 'unassigned' : 'confirmed',
+            isGCalLinked: existing.isGCalLinked ?? !existing.id.startsWith('evt-')
+          });
+        } else {
+          // Unmatched template: create routine placeholder
+          templateGeneratedCount++;
+          reconciledEvents.push({
+            id: `evt-${dateStr}-${tpl.id}`,
+            title: tpl.title,
+            childId: tpl.childId,
+            assignedTo: assignedCaregiver,
+            travelCoveringFor: coveringFor,
+            date: dateStr,
+            startTime: tpl.startTime,
+            endTime: tpl.endTime,
+            location: tpl.location,
+            category: tpl.category,
+            isRecurringMaster: true,
+            masterSeriesId: tpl.id,
+            notes: eventNotes,
+            status: assignedCaregiver === 'unassigned' ? 'unassigned' : 'confirmed',
+            isGCalLinked: false
+          });
+        }
       }
+
+      // Preserve any other existing events on this date that weren't covered by a template
+      const otherEvents = weekEvents.filter((e) => e.date === dateStr && !matchedExistingEventIds.has(e.id));
+      reconciledEvents.push(...otherEvents);
     }
 
-    const sundayDate = new Date(monday);
-    sundayDate.setDate(monday.getDate() + 6);
-    const sundayStr = sundayDate.toISOString().split('T')[0];
-
-    const merged = events.filter((e) => e.date < mondayDateStr || e.date > sundayStr).concat(generatedEvents);
+    const merged = events.filter((e) => e.date < mondayDateStr || e.date > sundayStr).concat(reconciledEvents);
     setEvents(merged);
     setHolidays((prev) => prev.filter((h) => h.date < mondayDateStr || h.date > sundayStr));
-    addToast(`Applied weekly blueprint (${generatedEvents.length} events generated)`, 'success');
+
+    if (reconciledCount > 0) {
+      addToast(`Reconciled ${reconciledCount} existing calendar invite(s) in place without duplicates (${templateGeneratedCount} template entries).`, 'success');
+    } else {
+      addToast(`Applied weekly blueprint (${templateGeneratedCount} events generated)`, 'success');
+    }
+
+    GoogleCalendarService.addSyncLog({
+      action: 'fetch_events',
+      status: 'info',
+      summary: `Applied weekly blueprint to week of ${mondayDateStr}`,
+      details: `Reconciled ${reconciledCount} existing calendar invites in place to prevent duplicate events. ${templateGeneratedCount} template entries.`
+    });
 
     try {
       await fetch('/api/templates/apply-week', {

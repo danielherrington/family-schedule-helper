@@ -7,9 +7,13 @@ import {
   ExternalLink, 
   LogOut, 
   RefreshCw, 
-  Sparkles 
+  Sparkles,
+  Activity,
+  Sliders
 } from 'lucide-react';
 import { Modal } from './ui/Modal';
+import { SegmentedTabs } from './ui/SegmentedTabs';
+import { SyncLogsViewer } from './SyncLogsViewer';
 
 export const CalendarSettingsModal: React.FC = () => {
   const { 
@@ -32,6 +36,7 @@ export const CalendarSettingsModal: React.FC = () => {
     isLoading
   } = useSchedule();
 
+  const [activeTab, setActiveTab] = useState<'settings' | 'logs'>('settings');
   const [isConnecting, setIsConnecting] = useState(false);
 
   if (!isSettingsOpen) return null;
@@ -51,8 +56,8 @@ export const CalendarSettingsModal: React.FC = () => {
     <Modal
       isOpen={isSettingsOpen}
       onClose={() => setIsSettingsOpen(false)}
-      title="Google Calendar Live Sync Settings"
-      subtitle="Configure live Google OAuth 2.0 and Family Calendar mappings"
+      title="Google Calendar Live Sync & Diagnostics"
+      subtitle="Configure Google OAuth 2.0, Family Calendar mappings, and inspect live API sync telemetry"
       icon={<Calendar size={20} color="var(--primary)" />}
       size="lg"
       footer={
@@ -66,17 +71,40 @@ export const CalendarSettingsModal: React.FC = () => {
         </button>
       }
     >
-      {/* Manager Auth Card */}
-      <div style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '14px 16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <ShieldCheck size={20} color={isLive ? 'var(--success)' : 'var(--accent)'} />
-            <span style={{ fontWeight: 800 }}>Google Account Connection</span>
-          </div>
-          <span className={`status-indicator ${isLive ? 'status-confirmed' : ''}`} style={{ fontWeight: 700 }}>
-            {isLive ? '● Live Google Calendar Connected' : '● Demo / Blueprint Mode'}
-          </span>
-        </div>
+      <SegmentedTabs
+        activeTab={activeTab}
+        onChange={(tabId) => setActiveTab(tabId as 'settings' | 'logs')}
+        tabs={[
+          {
+            id: 'settings',
+            label: 'Calendar & Mappings',
+            icon: <Sliders size={14} />
+          },
+          {
+            id: 'logs',
+            label: 'Live Sync Logs & Diagnostics',
+            mobileLabel: 'Sync Logs',
+            icon: <Activity size={14} />
+          }
+        ]}
+        style={{ marginBottom: '16px' }}
+      />
+
+      {activeTab === 'logs' ? (
+        <SyncLogsViewer />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Manager Auth Card */}
+          <div style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '14px 16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ShieldCheck size={20} color={isLive ? 'var(--success)' : 'var(--accent)'} />
+                <span style={{ fontWeight: 800 }}>Google Account Connection</span>
+              </div>
+              <span className={`status-indicator ${isLive ? 'status-confirmed' : ''}`} style={{ fontWeight: 700 }}>
+                {isLive ? '● Live Google Calendar Connected' : '● Demo / Blueprint Mode'}
+              </span>
+            </div>
 
         {isLive ? (
           <div>
@@ -391,6 +419,8 @@ export const CalendarSettingsModal: React.FC = () => {
           </div>
         </div>
       </div>
-    </Modal>
+    </div>
+  )}
+</Modal>
   );
 };
