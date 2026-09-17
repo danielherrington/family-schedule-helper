@@ -8,9 +8,11 @@ import {
   Palmtree, 
   Sunrise, 
   Sun, 
-  Moon, 
+  Moon,
   Plus,
-  Calendar
+  Calendar,
+  Share2,
+  User
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { isTodayOrUpcoming } from '../utils/dateUtils';
@@ -25,7 +27,11 @@ export const WeeklyMatrixView: React.FC = () => {
     setViewMode, 
     applyWeeklyBlueprint, 
     children: childrenList, 
+    caregivers,
     holidays,
+    selectedCaregiverFilter,
+    setSelectedCaregiverFilter,
+    setIsShareDispatchOpen,
     openAddEventModal
   } = useSchedule();
 
@@ -44,125 +50,192 @@ export const WeeklyMatrixView: React.FC = () => {
   return (
     <div>
       {/* Header Controls: Filters & Quick Actions */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-        
-        {/* Child & Category Filters */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          {/* Kids Filter */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-            <Filter size={15} color="var(--text-muted)" />
-            <button
-              className={`btn ${selectedChildFilter === 'all' ? 'btn-primary' : ''}`}
-              style={{ padding: '5px 12px', fontSize: '0.82rem' }}
-              onClick={() => setSelectedChildFilter('all')}
-            >
-              All Kids
-            </button>
-            {childrenList.map((ch) => {
-              const isSelected = selectedChildFilter === ch.id;
-              const isMoe = ch.id === 'moe';
-              return (
-                <button
-                  key={ch.id}
-                  className={`btn ${isSelected ? 'btn-primary' : ''}`}
-                  style={{
-                    padding: '5px 12px',
-                    fontSize: '0.82rem',
-                    borderColor: isSelected ? ch.color : isMoe ? 'rgba(255, 42, 133, 0.45)' : undefined,
-                    background: isSelected ? ch.color : isMoe ? 'rgba(255, 42, 133, 0.08)' : undefined,
-                    color: isSelected ? '#fff' : isMoe ? '#FF2A85' : undefined,
-                    boxShadow: isMoe && isSelected ? '0 0 10px rgba(255, 42, 133, 0.45)' : undefined,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px'
-                  }}
-                  onClick={() => setSelectedChildFilter(ch.id)}
-                >
-                  {isMoe && <DachshundIcon size={13} color={isSelected ? '#fff' : '#FF2A85'} />}
-                  <span>{ch.name}</span>
-                </button>
-              );
-            })}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+        {/* Row 1: Filters & Quick Actions */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+          {/* Child & Category Filters */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            {/* Kids Filter */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+              <Filter size={15} color="var(--text-muted)" />
+              <button
+                className={`btn ${selectedChildFilter === 'all' ? 'btn-primary' : ''}`}
+                style={{ padding: '5px 12px', fontSize: '0.82rem' }}
+                onClick={() => setSelectedChildFilter('all')}
+              >
+                All Kids
+              </button>
+              {childrenList.map((ch) => {
+                const isSelected = selectedChildFilter === ch.id;
+                const isMoe = ch.id === 'moe';
+                return (
+                  <button
+                    key={ch.id}
+                    className={`btn ${isSelected ? 'btn-primary' : ''}`}
+                    style={{
+                      padding: '5px 12px',
+                      fontSize: '0.82rem',
+                      borderColor: isSelected ? ch.color : isMoe ? 'rgba(255, 42, 133, 0.45)' : undefined,
+                      background: isSelected ? ch.color : isMoe ? 'rgba(255, 42, 133, 0.08)' : undefined,
+                      color: isSelected ? '#fff' : isMoe ? '#FF2A85' : undefined,
+                      boxShadow: isMoe && isSelected ? '0 0 10px rgba(255, 42, 133, 0.45)' : undefined,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}
+                    onClick={() => setSelectedChildFilter(ch.id)}
+                  >
+                    {isMoe && <DachshundIcon size={13} color={isSelected ? '#fff' : '#FF2A85'} />}
+                    <span>{ch.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div style={{ width: '1px', height: '20px', background: 'var(--border)', margin: '0 4px' }} className="hide-mobile" />
+
+            {/* Shift / Category Filter Pills */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+              <button
+                className={`btn ${selectedCategoryFilter === 'all' ? 'btn-primary' : ''}`}
+                style={{ padding: '5px 12px', fontSize: '0.82rem' }}
+                onClick={() => setSelectedCategoryFilter('all')}
+              >
+                All Shifts
+              </button>
+              <button
+                className="btn"
+                style={{
+                  padding: '5px 12px',
+                  fontSize: '0.82rem',
+                  borderColor: selectedCategoryFilter === 'dropoff' ? '#f59e0b' : undefined,
+                  background: selectedCategoryFilter === 'dropoff' ? 'rgba(245, 158, 11, 0.15)' : undefined,
+                  color: selectedCategoryFilter === 'dropoff' ? '#b45309' : undefined,
+                  fontWeight: selectedCategoryFilter === 'dropoff' ? 700 : undefined
+                }}
+                onClick={() => setSelectedCategoryFilter(selectedCategoryFilter === 'dropoff' ? 'all' : 'dropoff')}
+              >
+                <Sunrise size={13} style={{ marginRight: '4px', verticalAlign: '-1px', color: '#f59e0b' }} />
+                <span>Morning Runs</span>
+              </button>
+              <button
+                className="btn"
+                style={{
+                  padding: '5px 12px',
+                  fontSize: '0.82rem',
+                  borderColor: selectedCategoryFilter === 'pickup' ? '#3b82f6' : undefined,
+                  background: selectedCategoryFilter === 'pickup' ? 'rgba(59, 130, 246, 0.15)' : undefined,
+                  color: selectedCategoryFilter === 'pickup' ? '#1d4ed8' : undefined,
+                  fontWeight: selectedCategoryFilter === 'pickup' ? 700 : undefined
+                }}
+                onClick={() => setSelectedCategoryFilter(selectedCategoryFilter === 'pickup' ? 'all' : 'pickup')}
+              >
+                <Sun size={13} style={{ marginRight: '4px', verticalAlign: '-1px', color: '#3b82f6' }} />
+                <span>Pickups</span>
+              </button>
+              <button
+                className="btn"
+                style={{
+                  padding: '5px 12px',
+                  fontSize: '0.82rem',
+                  borderColor: selectedCategoryFilter === 'activity' ? '#a855f7' : undefined,
+                  background: selectedCategoryFilter === 'activity' ? 'rgba(168, 85, 247, 0.15)' : undefined,
+                  color: selectedCategoryFilter === 'activity' ? '#7e22ce' : undefined,
+                  fontWeight: selectedCategoryFilter === 'activity' ? 700 : undefined
+                }}
+                onClick={() => setSelectedCategoryFilter(selectedCategoryFilter === 'activity' ? 'all' : 'activity')}
+              >
+                <Moon size={13} style={{ marginRight: '4px', verticalAlign: '-1px', color: '#a855f7' }} />
+                <span>Evening Routines</span>
+              </button>
+            </div>
           </div>
 
-          <div style={{ width: '1px', height: '20px', background: 'var(--border)', margin: '0 4px' }} className="hide-mobile" />
-
-          {/* Shift / Category Filter Pills */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+          {/* Action Controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <button
-              className={`btn ${selectedCategoryFilter === 'all' ? 'btn-primary' : ''}`}
-              style={{ padding: '5px 12px', fontSize: '0.82rem' }}
-              onClick={() => setSelectedCategoryFilter('all')}
-            >
-              All Shifts
-            </button>
-            <button
+              type="button"
               className="btn"
               style={{
-                padding: '5px 12px',
-                fontSize: '0.82rem',
-                borderColor: selectedCategoryFilter === 'dropoff' ? '#f59e0b' : undefined,
-                background: selectedCategoryFilter === 'dropoff' ? 'rgba(245, 158, 11, 0.15)' : undefined,
-                color: selectedCategoryFilter === 'dropoff' ? '#b45309' : undefined,
-                fontWeight: selectedCategoryFilter === 'dropoff' ? 700 : undefined
+                borderColor: '#25D366',
+                color: '#128C7E',
+                background: 'rgba(37, 211, 102, 0.08)',
+                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px'
               }}
-              onClick={() => setSelectedCategoryFilter(selectedCategoryFilter === 'dropoff' ? 'all' : 'dropoff')}
+              onClick={() => setIsShareDispatchOpen(true)}
+              title="Share Schedule via WhatsApp, iMessage, or Copy"
             >
-              <Sunrise size={13} style={{ marginRight: '4px', verticalAlign: '-1px', color: '#f59e0b' }} />
-              <span>Morning Runs</span>
+              <Share2 size={15} color="#25D366" />
+              <span>Share</span>
             </button>
             <button
-              className="btn"
-              style={{
-                padding: '5px 12px',
-                fontSize: '0.82rem',
-                borderColor: selectedCategoryFilter === 'pickup' ? '#3b82f6' : undefined,
-                background: selectedCategoryFilter === 'pickup' ? 'rgba(59, 130, 246, 0.15)' : undefined,
-                color: selectedCategoryFilter === 'pickup' ? '#1d4ed8' : undefined,
-                fontWeight: selectedCategoryFilter === 'pickup' ? 700 : undefined
-              }}
-              onClick={() => setSelectedCategoryFilter(selectedCategoryFilter === 'pickup' ? 'all' : 'pickup')}
+              className="btn btn-primary"
+              style={{ padding: '6px 14px', fontSize: '0.85rem', fontWeight: 700 }}
+              onClick={() => openAddEventModal(activeMondayStr)}
+              title="Schedule a new pickup, drop-off, or activity event"
             >
-              <Sun size={13} style={{ marginRight: '4px', verticalAlign: '-1px', color: '#3b82f6' }} />
-              <span>Pickups</span>
+              <Plus size={15} />
+              <span>Add Event</span>
             </button>
-            <button
+            <button 
               className="btn"
-              style={{
-                padding: '5px 12px',
-                fontSize: '0.82rem',
-                borderColor: selectedCategoryFilter === 'activity' ? '#a855f7' : undefined,
-                background: selectedCategoryFilter === 'activity' ? 'rgba(168, 85, 247, 0.15)' : undefined,
-                color: selectedCategoryFilter === 'activity' ? '#7e22ce' : undefined,
-                fontWeight: selectedCategoryFilter === 'activity' ? 700 : undefined
-              }}
-              onClick={() => setSelectedCategoryFilter(selectedCategoryFilter === 'activity' ? 'all' : 'activity')}
+              onClick={() => applyWeeklyBlueprint(activeMondayStr)}
+              title={`Refresh active week (${activeMondayStr}) from routine blueprint`}
             >
-              <Moon size={13} style={{ marginRight: '4px', verticalAlign: '-1px', color: '#a855f7' }} />
-              <span>Evening Routines</span>
+              <Sparkles size={15} color="var(--accent)" />
+              <span>Reset to Blueprint</span>
             </button>
           </div>
         </div>
 
-        {/* Action Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {/* Row 2: Driver Filter Row (DAN-10) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', width: '100%', paddingTop: '8px', borderTop: '1px dashed var(--border)' }}>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <User size={14} />
+            <span>Driver:</span>
+          </span>
           <button
-            className="btn btn-primary"
-            style={{ padding: '6px 14px', fontSize: '0.85rem', fontWeight: 700 }}
-            onClick={() => openAddEventModal(activeMondayStr)}
-            title="Schedule a new pickup, drop-off, or activity event"
+            className={`btn ${selectedCaregiverFilter === 'all' ? 'btn-primary' : ''}`}
+            style={{ padding: '4px 10px', fontSize: '0.78rem', borderRadius: '6px' }}
+            onClick={() => setSelectedCaregiverFilter('all')}
           >
-            <Plus size={15} />
-            <span>Add Event</span>
+            All Drivers
           </button>
-          <button 
-            className="btn"
-            onClick={() => applyWeeklyBlueprint(activeMondayStr)}
-            title={`Refresh active week (${activeMondayStr}) from routine blueprint`}
-          >
-            <Sparkles size={15} color="var(--accent)" />
-            <span>Reset to Blueprint</span>
-          </button>
+          {caregivers.map((cg) => {
+            const isSelected = selectedCaregiverFilter === cg.id;
+            return (
+              <button
+                key={cg.id}
+                className={`btn ${isSelected ? 'btn-primary' : ''}`}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '0.78rem',
+                  borderRadius: '6px',
+                  borderColor: isSelected ? cg.avatarColor : undefined,
+                  background: isSelected ? cg.avatarColor : undefined,
+                  color: isSelected ? '#fff' : undefined,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px'
+                }}
+                onClick={() => setSelectedCaregiverFilter(isSelected ? 'all' : cg.id)}
+                title={`Filter for ${cg.name}'s duties`}
+              >
+                <span 
+                  style={{ 
+                    width: '8px', 
+                    height: '8px', 
+                    borderRadius: '50%', 
+                    background: isSelected ? '#fff' : cg.avatarColor 
+                  }} 
+                />
+                <span>{cg.name.split(' ')[0]}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -173,7 +246,8 @@ export const WeeklyMatrixView: React.FC = () => {
             .filter((e) => {
               const matchesDate = e.date === d.dateStr;
               const matchesChild = selectedChildFilter === 'all' || e.childId === selectedChildFilter || e.childId === 'all';
-              return matchesDate && matchesChild;
+              const matchesCaregiver = selectedCaregiverFilter === 'all' || e.assignedTo === selectedCaregiverFilter;
+              return matchesDate && matchesChild && matchesCaregiver;
             })
             .sort((a, b) => a.startTime.localeCompare(b.startTime));
 

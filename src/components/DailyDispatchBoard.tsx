@@ -12,7 +12,9 @@ import {
   Sunrise, 
   Sun, 
   Moon,
-  Sparkles
+  Sparkles,
+  Share2,
+  User
 } from 'lucide-react';
 import { getHolidayForDate } from '../utils/holidayEngine';
 import { isTodayOrUpcoming } from '../utils/dateUtils';
@@ -28,7 +30,10 @@ export const DailyDispatchBoard: React.FC = () => {
     caregivers, 
     setIsSetupOpen, 
     setActiveSetupTab,
-    openAddEventModal
+    openAddEventModal,
+    selectedCaregiverFilter,
+    setSelectedCaregiverFilter,
+    setIsShareDispatchOpen
   } = useSchedule();
   const [selectedChildFilter, setSelectedChildFilter] = useState<string>('all');
   const [isHolidayModalOpen, setIsHolidayModalOpen] = useState<boolean>(false);
@@ -37,7 +42,8 @@ export const DailyDispatchBoard: React.FC = () => {
     .filter((e) => {
       const matchesDate = e.date === selectedDate;
       const matchesChild = selectedChildFilter === 'all' || e.childId === selectedChildFilter || e.childId === 'all';
-      return matchesDate && matchesChild;
+      const matchesCaregiver = selectedCaregiverFilter === 'all' || e.assignedTo === selectedCaregiverFilter;
+      return matchesDate && matchesChild && matchesCaregiver;
     })
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
@@ -172,6 +178,25 @@ export const DailyDispatchBoard: React.FC = () => {
         {/* Action Controls & Stats */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <button
+            type="button"
+            className="btn"
+            style={{
+              borderColor: '#25D366',
+              color: '#128C7E',
+              background: 'rgba(37, 211, 102, 0.08)',
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+            onClick={() => setIsShareDispatchOpen(true)}
+            title="Share this day's schedule via WhatsApp, iMessage, or Copy"
+          >
+            <Share2 size={15} color="#25D366" />
+            <span>Share Dispatch</span>
+          </button>
+
+          <button
             className="btn btn-primary"
             style={{ padding: '6px 14px', fontSize: '0.85rem', fontWeight: 700 }}
             onClick={() => openAddEventModal(selectedDate)}
@@ -194,7 +219,58 @@ export const DailyDispatchBoard: React.FC = () => {
             <Palmtree size={15} />
             <span>{detectedHoliday ? `Mark ${detectedHoliday.name.split('—')[0].trim()}` : 'Mark Holiday'}</span>
           </button>
+        </div>
 
+        {/* Driver / Caregiver Filter Selector (DAN-10) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', width: '100%', paddingTop: '8px' }}>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <User size={14} />
+            <span>Driver:</span>
+          </span>
+          <button
+            className={`btn ${selectedCaregiverFilter === 'all' ? 'btn-primary' : ''}`}
+            style={{ padding: '4px 10px', fontSize: '0.78rem', borderRadius: '6px' }}
+            onClick={() => setSelectedCaregiverFilter('all')}
+          >
+            All Drivers
+          </button>
+          {caregivers.map((cg) => {
+            const isSelected = selectedCaregiverFilter === cg.id;
+            const count = events.filter((e) => e.date === selectedDate && e.assignedTo === cg.id && e.status !== 'cancelled').length;
+            return (
+              <button
+                key={cg.id}
+                className={`btn ${isSelected ? 'btn-primary' : ''}`}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '0.78rem',
+                  borderRadius: '6px',
+                  borderColor: isSelected ? cg.avatarColor : undefined,
+                  background: isSelected ? cg.avatarColor : undefined,
+                  color: isSelected ? '#fff' : undefined,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px'
+                }}
+                onClick={() => setSelectedCaregiverFilter(isSelected ? 'all' : cg.id)}
+                title={`Filter for ${cg.name}'s duties`}
+              >
+                <span 
+                  style={{ 
+                    width: '8px', 
+                    height: '8px', 
+                    borderRadius: '50%', 
+                    background: isSelected ? '#fff' : cg.avatarColor 
+                  }} 
+                />
+                <span>{cg.name.split(' ')[0]} ({count})</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Stats Row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', width: '100%', paddingTop: '4px' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--success)', fontSize: '0.85rem' }}>
             <CheckCircle2 size={15} />
             <span><strong>{totalAssigned}</strong> Active</span>

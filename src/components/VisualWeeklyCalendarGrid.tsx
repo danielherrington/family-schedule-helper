@@ -14,7 +14,8 @@ import {
   Palmtree, 
   AlertTriangle,
   AlertCircle,
-  Plus
+  Plus,
+  Share2
 } from 'lucide-react';
 
 interface PositionedEvent {
@@ -41,7 +42,10 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
     setSelectedDate,
     setViewMode,
     openAddEventModal,
-    setReassignModalEvent
+    setReassignModalEvent,
+    selectedCaregiverFilter,
+    setSelectedCaregiverFilter,
+    setIsShareDispatchOpen
   } = useSchedule();
 
   const [selectedChildFilter, setSelectedChildFilter] = useState<string>('all');
@@ -258,34 +262,83 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
     <div className="visual-calendar-wrapper">
       {/* Top Filter & Blueprint Bar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <Filter size={16} color="var(--text-muted)" />
-          <button
-            className={`btn ${selectedChildFilter === 'all' ? 'btn-primary' : ''}`}
-            style={{ padding: '6px 14px', fontSize: '0.85rem' }}
-            onClick={() => setSelectedChildFilter('all')}
-          >
-            All Kids
-          </button>
-          {childrenList.map((ch) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+          {/* Kids Filter */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <Filter size={16} color="var(--text-muted)" />
             <button
-              key={ch.id}
-              className={`btn ${selectedChildFilter === ch.id ? 'btn-primary' : ''}`}
-              style={{
-                padding: '6px 14px',
-                fontSize: '0.85rem',
-                borderColor: selectedChildFilter === ch.id ? ch.color : undefined,
-                background: selectedChildFilter === ch.id ? ch.color : undefined,
-                color: selectedChildFilter === ch.id ? '#fff' : undefined
-              }}
-              onClick={() => setSelectedChildFilter(ch.id)}
+              className={`btn ${selectedChildFilter === 'all' ? 'btn-primary' : ''}`}
+              style={{ padding: '6px 14px', fontSize: '0.85rem' }}
+              onClick={() => setSelectedChildFilter('all')}
             >
-              {ch.name}
+              All Kids
             </button>
-          ))}
+            {childrenList.map((ch) => (
+              <button
+                key={ch.id}
+                className={`btn ${selectedChildFilter === ch.id ? 'btn-primary' : ''}`}
+                style={{
+                  padding: '6px 14px',
+                  fontSize: '0.85rem',
+                  borderColor: selectedChildFilter === ch.id ? ch.color : undefined,
+                  background: selectedChildFilter === ch.id ? ch.color : undefined,
+                  color: selectedChildFilter === ch.id ? '#fff' : undefined
+                }}
+                onClick={() => setSelectedChildFilter(ch.id)}
+              >
+                {ch.name}
+              </button>
+            ))}
+          </div>
+
+          {/* Caregiver / Driver Filter */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>Driver:</span>
+            <button
+              className={`btn ${selectedCaregiverFilter === 'all' ? 'btn-primary' : ''}`}
+              style={{ padding: '4px 10px', fontSize: '0.8rem' }}
+              onClick={() => setSelectedCaregiverFilter('all')}
+            >
+              All Drivers
+            </button>
+            {caregivers.map((cg) => (
+              <button
+                key={cg.id}
+                className={`btn ${selectedCaregiverFilter === cg.id ? 'btn-primary' : ''}`}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '0.8rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+                onClick={() => setSelectedCaregiverFilter(cg.id)}
+              >
+                <span
+                  style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    backgroundColor: cg.avatarColor,
+                    display: 'inline-block'
+                  }}
+                />
+                {cg.name}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            className="btn"
+            style={{ borderColor: '#25D366', color: '#25D366' }}
+            onClick={() => setIsShareDispatchOpen(true)}
+            title="Share Schedule via WhatsApp / iMessage"
+          >
+            <Share2 size={15} color="#25D366" />
+            <span>Share</span>
+          </button>
           <button 
             className="btn"
             onClick={() => applyWeeklyBlueprint(weekDays[0].dateStr)}
@@ -378,7 +431,8 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
               const dayEvents = events.filter((e) => {
                 const matchesDate = e.date === d.dateStr;
                 const matchesChild = selectedChildFilter === 'all' || e.childId === selectedChildFilter || e.childId === 'all';
-                return matchesDate && matchesChild;
+                const matchesCaregiver = selectedCaregiverFilter === 'all' || e.assignedTo === selectedCaregiverFilter;
+                return matchesDate && matchesChild && matchesCaregiver;
               });
 
               const dayHoliday = holidays.find((h) => h.date === d.dateStr);

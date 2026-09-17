@@ -44,6 +44,18 @@ export interface DispatchEvent {
   hasConflict?: boolean;
   travelCoveringFor?: CaregiverId;
   isGCalLinked?: boolean;
+  linkedContactId?: string;
+  linkedContactPhone?: string;
+  linkedContactName?: string;
+}
+
+export interface ParentContact {
+  id: string;
+  parentName: string;
+  childName: string;
+  phone: string;
+  relationship?: string;
+  notes?: string;
 }
 
 export interface CaregiverTravel {

@@ -15,5 +15,9 @@
   ],
   "theme_color": "#FF5E7E",
   "background_color": "#F8FAFC",
-  "display": "standalone"
+  "display": "standalone",
+  "start_url": "/",
+  "scope": "/",
+  "orientation": "portrait-primary",
+  "description": "Family childcare coordination, school logistics, and routine dispatch helper."
 }

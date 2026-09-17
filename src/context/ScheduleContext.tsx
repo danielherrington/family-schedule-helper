@@ -9,13 +9,15 @@ import {
   EventTemplate, 
   DayHoliday,
   StagedSyncItem,
-  CaregiverTravel 
+  CaregiverTravel,
+  ParentContact
 } from '../types/schedule';
 import { 
   DEFAULT_CAREGIVERS, 
   DEFAULT_CHILDREN, 
   DEFAULT_TEMPLATES, 
-  DEFAULT_WEEK_EVENTS 
+  DEFAULT_WEEK_EVENTS,
+  DEFAULT_PARENT_CONTACTS
 } from './defaultSeed';
 import { GoogleCalendarService, GCalUserCalendar } from '../services/googleCalendarClient';
 import { isTodayOrUpcoming, getTodayDateStr } from '../utils/dateUtils';
@@ -46,6 +48,8 @@ interface ScheduleContextType {
   gaps: ScheduleGap[];
   isLoading: boolean;
   toasts: Toast[];
+  addToast: (message: string, type?: 'success' | 'info' | 'warning' | 'error') => void;
+  removeToast: (id: string) => void;
   authStatus: { mode: 'demo_mode' | 'live_gcal'; isConfigured: boolean };
   reassignModalEvent: DispatchEvent | null;
   isSettingsOpen: boolean;
@@ -79,7 +83,11 @@ interface ScheduleContextType {
   reassignEvent: (eventId: string, targetCaregiverId: CaregiverId, reason?: string) => Promise<void>;
   rescheduleEvent: (eventId: string, newDate: string, newStartTime: string, newEndTime: string) => Promise<void>;
   cancelEventInstance: (eventId: string, reason?: string) => Promise<void>;
-  markNoPickupNeeded: (eventId: string, reason?: string) => Promise<void>;
+  markNoPickupNeeded: (
+    eventId: string, 
+    reason?: string, 
+    contactInfo?: { id?: string; name?: string; phone?: string }
+  ) => Promise<void>;
   restoreEventInstance: (eventId: string) => Promise<void>;
   markDayAsHoliday: (dateStr: string, holidayName: string, childId?: string) => Promise<void>;
   setReassignModalEvent: (event: DispatchEvent | null) => void;
@@ -98,8 +106,20 @@ interface ScheduleContextType {
   getCaregiverTravelForDate: (caregiverId: string, dateStr: string) => CaregiverTravel | undefined;
   setActiveSetupTab: (tab: 'caregivers' | 'kids' | 'blueprint') => void;
   resetToDemoSchedule: () => Promise<void>;
-  addToast: (message: string, type?: 'success' | 'info' | 'warning' | 'error') => void;
-  removeToast: (id: string) => void;
+  // Caregiver Filter & Share
+  selectedCaregiverFilter: CaregiverId | 'all';
+  setSelectedCaregiverFilter: (cgId: CaregiverId | 'all') => void;
+  isShareDispatchOpen: boolean;
+  setIsShareDispatchOpen: (open: boolean) => void;
+
+  // Parent Contact Directory (DAN-14)
+  parentContacts: ParentContact[];
+  addParentContact: (contact: Omit<ParentContact, 'id'>) => Promise<void>;
+  updateParentContact: (id: string, updates: Partial<ParentContact>) => Promise<void>;
+  deleteParentContact: (id: string) => Promise<void>;
+  isParentDirectoryOpen: boolean;
+  setIsParentDirectoryOpen: (open: boolean) => void;
+
   changeDateByDays: (days: number) => void;
 
   // Google Calendar Live Sync Actions
@@ -498,6 +518,61 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } catch {}
     return [];
   });
+
+  // Caregiver Filter State (DAN-10)
+  const [selectedCaregiverFilter, setSelectedCaregiverFilterState] = useState<CaregiverId | 'all'>(() => {
+    try {
+      const saved = localStorage.getItem('schedule_selected_caregiver_filter');
+      if (saved) return saved as CaregiverId | 'all';
+    } catch {}
+    return 'all';
+  });
+
+  const setSelectedCaregiverFilter = (cgId: CaregiverId | 'all') => {
+    setSelectedCaregiverFilterState(cgId);
+    try {
+      localStorage.setItem('schedule_selected_caregiver_filter', cgId);
+    } catch {}
+  };
+
+  // 1-Tap Share Dispatch Modal (DAN-9)
+  const [isShareDispatchOpen, setIsShareDispatchOpen] = useState<boolean>(false);
+
+  // Playdate & Carpool Parent Contact Directory (DAN-14)
+  const [parentContacts, setParentContacts] = useState<ParentContact[]>(() => {
+    try {
+      const saved = localStorage.getItem('schedule_parent_contacts_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return DEFAULT_PARENT_CONTACTS;
+  });
+  const [isParentDirectoryOpen, setIsParentDirectoryOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('schedule_parent_contacts_v1', JSON.stringify(parentContacts));
+    } catch {}
+  }, [parentContacts]);
+
+  const addParentContact = async (data: Omit<ParentContact, 'id'>) => {
+    const id = `contact-${Date.now()}`;
+    const newContact: ParentContact = { id, ...data };
+    setParentContacts((prev) => [...prev, newContact]);
+    addToast(`Added contact "${newContact.parentName}"`, 'success');
+  };
+
+  const updateParentContact = async (id: string, updates: Partial<ParentContact>) => {
+    setParentContacts((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)));
+    addToast('Contact updated.', 'success');
+  };
+
+  const deleteParentContact = async (id: string) => {
+    setParentContacts((prev) => prev.filter((c) => c.id !== id));
+    addToast('Contact removed.', 'info');
+  };
 
   // Staged Sync State ("Safe Mode")
   const [syncMode, setSyncModeState] = useState<'staged' | 'immediate'>(() => {
@@ -1171,7 +1246,11 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   // Mark Event as No Pickup / Drop-off Needed (e.g. Playdate, After-school care)
-  const markNoPickupNeeded = async (eventId: string, reason: string = 'No Pickup Needed') => {
+  const markNoPickupNeeded = async (
+    eventId: string, 
+    reason: string = 'No Pickup Needed',
+    contactInfo?: { id?: string; name?: string; phone?: string }
+  ) => {
     const targetEvent = events.find((e) => e.id === eventId);
     if (!targetEvent) return;
 
@@ -1181,7 +1260,10 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           ...e,
           status: 'no_pickup_needed' as const,
           isException: true,
-          cancellationReason: reason
+          cancellationReason: reason,
+          linkedContactId: contactInfo?.id,
+          linkedContactName: contactInfo?.name,
+          linkedContactPhone: contactInfo?.phone
         };
       }
       return e;
@@ -2051,6 +2133,10 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         isAuditLogOpen,
         isSetupOpen,
         activeSetupTab,
+        selectedCaregiverFilter,
+        setSelectedCaregiverFilter,
+        isShareDispatchOpen,
+        setIsShareDispatchOpen,
         setSelectedDate,
         setViewMode,
         reassignEvent,
@@ -2080,6 +2166,12 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         resetToDemoSchedule,
         addToast,
         removeToast,
+        parentContacts,
+        addParentContact,
+        updateParentContact,
+        deleteParentContact,
+        isParentDirectoryOpen,
+        setIsParentDirectoryOpen,
         changeDateByDays,
         userCalendars,
         activeCalendarId,

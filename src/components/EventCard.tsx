@@ -16,7 +16,9 @@ import {
   Trash2,
   Plane,
   Calendar,
-  Edit3
+  Edit3,
+  Phone,
+  MessageSquare
 } from 'lucide-react';
 import { DachshundIcon } from './ui/DachshundIcon';
 
@@ -33,13 +35,15 @@ export const EventCard: React.FC<EventCardProps> = ({ event }) => {
     markNoPickupNeeded,
     restoreEventInstance,
     isCaregiverOutOfTown,
-    setReassignModalEvent
+    setReassignModalEvent,
+    parentContacts
   } = useSchedule();
   
   const [showCancelPrompt, setShowCancelPrompt] = useState(false);
   const [showNoPickupPrompt, setShowNoPickupPrompt] = useState(false);
   const [cancelReason, setCancelReason] = useState('No Class / Holiday');
   const [noPickupReason, setNoPickupReason] = useState('Playdate / With Friend');
+  const [selectedContactId, setSelectedContactId] = useState<string>('');
 
   const isMoe = event.childId === 'moe' || event.title.toLowerCase().includes('moe');
   const child = childrenList.find((c) => c.id === event.childId);
@@ -71,8 +75,22 @@ export const EventCard: React.FC<EventCardProps> = ({ event }) => {
   };
 
   const handleConfirmNoPickup = (reasonToUse?: string) => {
-    markNoPickupNeeded(event.id, reasonToUse || noPickupReason);
+    const chosenContact = parentContacts.find((c) => c.id === selectedContactId);
+    const finalReason = chosenContact
+      ? `Playdate with ${chosenContact.childName || 'friend'} (${chosenContact.parentName})`
+      : (reasonToUse || noPickupReason);
+
+    markNoPickupNeeded(
+      event.id, 
+      finalReason, 
+      chosenContact ? {
+        id: chosenContact.id,
+        name: chosenContact.parentName,
+        phone: chosenContact.phone
+      } : undefined
+    );
     setShowNoPickupPrompt(false);
+    setSelectedContactId('');
   };
 
   // 1. Cancelled View (School Closed / Holiday)
@@ -194,7 +212,7 @@ export const EventCard: React.FC<EventCardProps> = ({ event }) => {
             background: 'rgba(139, 92, 246, 0.08)',
             padding: '6px 10px',
             borderRadius: '8px',
-            margin: '6px 0 12px 0', 
+            margin: '6px 0 8px 0', 
             display: 'flex', 
             alignItems: 'center', 
             gap: '6px',
@@ -204,6 +222,51 @@ export const EventCard: React.FC<EventCardProps> = ({ event }) => {
           <Smile size={14} color="#7C3AED" />
           <span>{event.cancellationReason || 'No Pickup Needed (Playdate / Activity)'}</span>
         </div>
+
+        {/* Clickable Friend & Parent Contact Dialing Row (DAN-14) */}
+        {event.linkedContactPhone && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', margin: '4px 0 12px 0' }}>
+            <a
+              href={`tel:${event.linkedContactPhone}`}
+              className="btn"
+              style={{
+                fontSize: '0.75rem',
+                padding: '4px 10px',
+                color: 'var(--primary)',
+                borderColor: 'var(--primary)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                textDecoration: 'none',
+                fontWeight: 700
+              }}
+            >
+              <Phone size={12} />
+              <span>Call {event.linkedContactName || 'Parent'} ({event.linkedContactPhone})</span>
+            </a>
+            <a
+              href={`https://wa.me/${event.linkedContactPhone.replace(/[^\d]/g, '')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn"
+              style={{
+                fontSize: '0.75rem',
+                padding: '4px 10px',
+                color: '#25D366',
+                borderColor: '#25D366',
+                background: 'rgba(37, 211, 102, 0.08)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                textDecoration: 'none',
+                fontWeight: 700
+              }}
+            >
+              <MessageSquare size={12} />
+              <span>WhatsApp</span>
+            </a>
+          </div>
+        )}
 
         {/* Tap any caregiver to re-assign if plans change */}
         <div style={{ fontSize: '0.725rem', color: 'var(--text-muted)', fontWeight: 700, marginBottom: '6px' }}>
@@ -454,6 +517,40 @@ export const EventCard: React.FC<EventCardProps> = ({ event }) => {
               </button>
             ))}
           </div>
+
+          {parentContacts.length > 0 && (
+            <div style={{ marginBottom: '8px' }}>
+              <label style={{ display: 'block', fontSize: '0.725rem', fontWeight: 700, color: '#6D28D9', marginBottom: '3px' }}>
+                Link Friend / Carpool Contact (Optional):
+              </label>
+              <select
+                value={selectedContactId}
+                onChange={(e) => {
+                  setSelectedContactId(e.target.value);
+                  const c = parentContacts.find((item) => item.id === e.target.value);
+                  if (c) {
+                    setNoPickupReason(`Playdate with ${c.childName || 'friend'} (${c.parentName})`);
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  padding: '6px 8px',
+                  fontSize: '0.775rem',
+                  borderRadius: '6px',
+                  border: '1px solid rgba(139, 92, 246, 0.4)',
+                  background: '#FFFFFF',
+                  color: 'var(--text)'
+                }}
+              >
+                <option value="">-- Select Contact / Friend (Optional) --</option>
+                {parentContacts.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.childName ? `${c.childName} (${c.parentName})` : c.parentName} — {c.phone}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div style={{ display: 'flex', gap: '6px' }}>
             <input 

@@ -1,4 +1,4 @@
-import { Caregiver, Child, EventTemplate, DispatchEvent } from '../types/schedule';
+import { Caregiver, Child, EventTemplate, DispatchEvent, ParentContact } from '../types/schedule';
 
 export const DEFAULT_CAREGIVERS: Caregiver[] = [
   {
@@ -580,3 +580,31 @@ export const DEFAULT_WEEK_EVENTS: DispatchEvent[] = [
     status: 'confirmed'
   }
 ];
+
+export const DEFAULT_PARENT_CONTACTS: ParentContact[] = [
+  {
+    id: 'contact-1',
+    parentName: 'Sarah Jenkins',
+    childName: 'Leo Jenkins',
+    phone: '+1 (305) 555-0142',
+    relationship: "Leo's Mom (Lehrman Pre-K)",
+    notes: 'Carpool buddy on Tuesdays & Thursdays'
+  },
+  {
+    id: 'contact-2',
+    parentName: 'David & Rachel Miller',
+    childName: 'Maya Miller',
+    phone: '+1 (305) 555-0188',
+    relationship: "Maya's Parents (Soccer / Ballet)",
+    notes: 'After-school soccer carpool'
+  },
+  {
+    id: 'contact-3',
+    parentName: 'Elena Rostova',
+    childName: 'Noah Rostova',
+    phone: '+1 (305) 555-0219',
+    relationship: "Noah's Mom (Neighborhood)",
+    notes: 'Playdate host & neighborhood carpool'
+  }
+];
+

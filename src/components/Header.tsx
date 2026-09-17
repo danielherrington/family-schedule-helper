@@ -15,7 +15,11 @@ import {
   Bell,
   Plus,
   CloudUpload,
-  Plane
+  Plane,
+  Share2,
+  UserCheck,
+  Phone,
+  X
 } from 'lucide-react';
 
 import { isTodayOrUpcoming, getTodayDateStr } from '../utils/dateUtils';
@@ -41,6 +45,11 @@ export const Header: React.FC = () => {
     setIsSundayAlertOpen,
     setIsTravelModalOpen,
     caregiverTravels,
+    caregivers,
+    selectedCaregiverFilter,
+    setSelectedCaregiverFilter,
+    setIsShareDispatchOpen,
+    setIsParentDirectoryOpen,
     openAddEventModal,
     resetToDemoSchedule 
   } = useSchedule();
@@ -193,6 +202,36 @@ export const Header: React.FC = () => {
               <span className="hide-mobile">Out of Town{caregiverTravels.length > 0 ? ` (${caregiverTravels.length})` : ''}</span>
             </button>
 
+            {/* Playdate & Carpool Parent Contact Directory (DAN-14) */}
+            <button
+              className="btn"
+              onClick={() => setIsParentDirectoryOpen(true)}
+              title="Playdate & Carpool Parent Contact Directory"
+              style={{ fontWeight: 700 }}
+            >
+              <Phone size={14} color="#7928CA" />
+              <span className="hide-mobile">Contacts</span>
+            </button>
+
+            {/* 1-Tap Share Daily Dispatch (DAN-9) */}
+            <button
+              className="btn"
+              onClick={() => setIsShareDispatchOpen(true)}
+              title="Share Today's Schedule via WhatsApp, iMessage, or Copy"
+              style={{
+                borderColor: '#25D366',
+                color: '#128C7E',
+                background: 'rgba(37, 211, 102, 0.08)',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <Share2 size={15} color="#25D366" />
+              <span className="hide-mobile">Share</span>
+            </button>
+
             {gaps.length > 0 && (
               <div className="gap-alert-pill">
                 <AlertCircle size={14} />
@@ -276,6 +315,42 @@ export const Header: React.FC = () => {
               <span>Matrix</span>
             </button>
           </div>
+
+          {/* Driver Filter Active Badge (DAN-10) */}
+          {selectedCaregiverFilter !== 'all' && (
+            <div 
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: `${caregivers.find(c => c.id === selectedCaregiverFilter)?.avatarColor || '#00B4D8'}18`,
+                border: `1px solid ${caregivers.find(c => c.id === selectedCaregiverFilter)?.avatarColor || '#00B4D8'}60`,
+                padding: '3px 8px',
+                borderRadius: '8px',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                color: caregivers.find(c => c.id === selectedCaregiverFilter)?.avatarColor || '#00B4D8'
+              }}
+            >
+              <span>Driver: {caregivers.find(c => c.id === selectedCaregiverFilter)?.name.split(' ')[0] || selectedCaregiverFilter}</span>
+              <button
+                type="button"
+                onClick={() => setSelectedCaregiverFilter('all')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: '1px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  color: 'inherit'
+                }}
+                title="Clear Driver Filter (Show All Drivers)"
+              >
+                <X size={13} />
+              </button>
+            </div>
+          )}
 
           <div className="date-navigator">
             <button 
