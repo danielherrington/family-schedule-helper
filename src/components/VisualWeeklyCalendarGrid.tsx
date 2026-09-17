@@ -67,6 +67,12 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
     setDropPreview(null);
   };
 
+  const START_HOUR = 7; // 7:00 AM
+  const END_HOUR = 20; // 8:00 PM (14th hour row, covers up to 9:00 PM)
+  const TOTAL_HOURS = END_HOUR - START_HOUR + 1; // 14 hours
+  const WINDOW_START_MIN = START_HOUR * 60; // 420 min
+  const WINDOW_DURATION_MIN = TOTAL_HOURS * 60; // 840 min (7 AM to 9 PM)
+
   const handleColumnDragOver = (e: React.DragEvent, dateStr: string) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
@@ -80,13 +86,11 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
     const [eH, eM] = (draggingEvent.endTime || draggingEvent.startTime || '08:30').split(':').map(Number);
     const durMin = Math.max(15, (eH * 60 + eM) - (sH * 60 + sM));
 
-    const windowStart = 7 * 60; // 7:00 AM = 420 min
-    const windowDuration = 12 * 60; // 720 min
-    const rawMin = windowStart + fraction * windowDuration;
+    const rawMin = WINDOW_START_MIN + fraction * WINDOW_DURATION_MIN;
 
     // Snap to 15-minute slot
     const snappedStartMin = Math.round(rawMin / 15) * 15;
-    const clampedStartMin = Math.max(windowStart, Math.min(19 * 60 - durMin, snappedStartMin));
+    const clampedStartMin = Math.max(WINDOW_START_MIN, Math.min((END_HOUR + 1) * 60 - durMin, snappedStartMin));
     const clampedEndMin = clampedStartMin + durMin;
 
     const formatM = (m: number) => {
@@ -97,8 +101,8 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
 
     const newStartTime = formatM(clampedStartMin);
     const newEndTime = formatM(clampedEndMin);
-    const topPercent = ((clampedStartMin - windowStart) / windowDuration) * 100;
-    const heightPercent = (durMin / windowDuration) * 100;
+    const topPercent = ((clampedStartMin - WINDOW_START_MIN) / WINDOW_DURATION_MIN) * 100;
+    const heightPercent = (durMin / WINDOW_DURATION_MIN) * 100;
 
     setDropPreview({
       dateStr,
@@ -147,15 +151,13 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
     { hour: 16, label: '4 PM' },
     { hour: 17, label: '5 PM' },
     { hour: 18, label: '6 PM' },
-    { hour: 19, label: '7 PM' }
+    { hour: 19, label: '7 PM' },
+    { hour: 20, label: '8 PM' }
   ];
 
   // Robust Overlap & Column Layout Algorithm (Google Calendar interval graph style)
   const layoutDayEvents = (dayEventsList: DispatchEvent[]): PositionedEvent[] => {
     if (dayEventsList.length === 0) return [];
-
-    const windowStart = 7 * 60; // 7:00 AM = 420 min
-    const windowDuration = 12 * 60; // 12 hours = 720 min
 
     // 1. Sort events by start time, then duration descending
     const sorted = [...dayEventsList].sort((a, b) => {
@@ -223,9 +225,9 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
 
       for (let c = 0; c < totalColumns; c++) {
         for (const item of columns[c]) {
-          const topPercent = Math.max(0, ((item.startMin - windowStart) / windowDuration) * 100);
+          const topPercent = Math.max(0, ((item.startMin - WINDOW_START_MIN) / WINDOW_DURATION_MIN) * 100);
           const durationMin = Math.max(30, item.endMin - item.startMin);
-          const heightPercent = (durationMin / windowDuration) * 100;
+          const heightPercent = (durationMin / WINDOW_DURATION_MIN) * 100;
 
           result.push({
             event: item.event,
@@ -441,6 +443,7 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
                         draggable={!isCancelled}
                         onDragStart={(e) => handleDragStart(e, evt)}
                         onDragEnd={handleDragEnd}
+                        onClick={() => setReassignModalEvent(evt)}
                         className={`calendar-event-block ${isCancelled ? 'is-cancelled' : ''} ${hasConflict ? 'has-conflict' : ''}`}
                         style={{
                           top: `${topPercent}%`,
@@ -449,7 +452,7 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
                           width: `calc(${colWidthPct}% - 4px)`,
                           borderLeftColor: isCancelled ? '#059669' : isNoPickupNeeded ? '#8B5CF6' : (child?.color || '#FF5E7E'),
                           backgroundColor: '#FFFFFF',
-                          cursor: isCancelled ? 'default' : 'grab',
+                          cursor: isCancelled ? 'pointer' : 'grab',
                           opacity: draggingEvent?.id === evt.id ? 0.35 : 1,
                           backgroundImage: isCancelled 
                             ? 'linear-gradient(135deg, rgba(5, 150, 105, 0.06), rgba(5, 150, 105, 0.02))'

@@ -15,7 +15,8 @@ import {
   Smile,
   Trash2,
   Plane,
-  Calendar
+  Calendar,
+  Edit3
 } from 'lucide-react';
 import { DachshundIcon } from './ui/DachshundIcon';
 
@@ -257,7 +258,12 @@ export const EventCard: React.FC<EventCardProps> = ({ event }) => {
               child?.name || (event.childId === 'all' ? 'All Kids' : event.childId)
             )}
           </span>
-          <span className="time-chip">
+          <span 
+            className="time-chip"
+            onClick={() => setReassignModalEvent(event)}
+            style={{ cursor: 'pointer' }}
+            title="Click to adjust event time, date, or driver"
+          >
             <Clock size={12} style={{ display: 'inline', marginRight: '3px', verticalAlign: '-1px' }} />
             {event.startTime} - {event.endTime}
           </span>
@@ -354,13 +360,24 @@ export const EventCard: React.FC<EventCardProps> = ({ event }) => {
             <Palmtree size={13} />
           </button>
 
-          {/* Edit / Remove Action */}
+          {/* Edit / Reschedule Action */}
+          <button
+            type="button"
+            className="nav-btn"
+            style={{ padding: '2px 6px', fontSize: '0.75rem', color: 'var(--primary)' }}
+            onClick={() => setReassignModalEvent(event)}
+            title="Edit event time, date, or driver"
+          >
+            <Edit3 size={13} />
+          </button>
+
+          {/* Delete Action */}
           <button
             type="button"
             className="nav-btn"
             style={{ padding: '2px 6px', fontSize: '0.75rem', color: 'var(--text-muted)' }}
             onClick={() => setReassignModalEvent(event)}
-            title="Reassign or permanently delete this event"
+            title="Delete or cancel this event"
           >
             <Trash2 size={13} />
           </button>
@@ -459,7 +476,14 @@ export const EventCard: React.FC<EventCardProps> = ({ event }) => {
       )}
 
       {/* Title & Location */}
-      <div className="event-mobile-title">{event.title}</div>
+      <div 
+        className="event-mobile-title"
+        onClick={() => setReassignModalEvent(event)}
+        style={{ cursor: 'pointer' }}
+        title="Click to adjust time, date, or driver"
+      >
+        {event.title}
+      </div>
       {event.location && (
         <div className="event-location">
           <MapPin size={13} style={{ flexShrink: 0 }} />

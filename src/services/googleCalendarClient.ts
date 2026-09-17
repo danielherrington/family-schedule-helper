@@ -405,7 +405,10 @@ export class GoogleCalendarService {
 
     if (gcalEvent.start?.dateTime) {
       const startD = new Date(gcalEvent.start.dateTime);
-      dateStr = startD.toISOString().split('T')[0];
+      const year = startD.getFullYear();
+      const month = String(startD.getMonth() + 1).padStart(2, '0');
+      const day = String(startD.getDate()).padStart(2, '0');
+      dateStr = `${year}-${month}-${day}`;
       startTimeStr = startD.toTimeString().substring(0, 5);
 
       if (gcalEvent.end?.dateTime) {

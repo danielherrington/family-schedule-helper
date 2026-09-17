@@ -958,13 +958,30 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return e;
     });
 
-    setEvents(updated);
+    setEvents((prev) => {
+      const updated = prev.map((e) => {
+        if (e.id === eventId) {
+          return {
+            ...e,
+            assignedTo: targetCaregiverId,
+            sourceCalendarId: targetCal,
+            isException: e.isRecurringMaster || !!e.masterSeriesId,
+            status: (targetCaregiverId === 'unassigned' ? 'unassigned' : 'confirmed') as 'confirmed' | 'unassigned',
+            cancellationReason: undefined
+          };
+        }
+        return e;
+      });
+      try {
+        localStorage.setItem('gcal_cached_events_v2', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+
     addToast(
       `✓ Reassigned "${targetEvent.title}" to ${targetCaregiver ? targetCaregiver.name : 'Unassigned'} (${targetCalName})`,
       'success'
     );
-
-
 
     if (GoogleCalendarService.isConnected()) {
       if (syncMode === 'immediate') {
@@ -1041,23 +1058,24 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const cal = targetEvent.sourceCalendarId || caregiverCalendarMappings[currentCgId]?.calendarId || caregiverCalendarMappings['shared']?.calendarId || activeCalendarId;
     const calName = caregiverCalendarMappings[currentCgId]?.calendarName || (userCalendars.find(c => c.id === cal)?.summary) || 'Current Calendar';
 
-    const updated = events.map((e) => {
-      if (e.id === eventId) {
-        return {
-          ...e,
-          date: newDate,
-          startTime: newStartTime,
-          endTime: newEndTime,
-          isException: e.isRecurringMaster || !!e.masterSeriesId
-        };
-      }
-      return e;
+    setEvents((prev) => {
+      const updated = prev.map((e) => {
+        if (e.id === eventId) {
+          return {
+            ...e,
+            date: newDate,
+            startTime: newStartTime,
+            endTime: newEndTime,
+            isException: e.isRecurringMaster || !!e.masterSeriesId
+          };
+        }
+        return e;
+      });
+      try {
+        localStorage.setItem('gcal_cached_events_v2', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
     });
-
-    setEvents(updated);
-    try {
-      localStorage.setItem('gcal_cached_events_v2', JSON.stringify(updated));
-    } catch (e) {}
 
     addToast(
       `✓ Rescheduled "${targetEvent.title}" to ${newDate} (${newStartTime} – ${newEndTime})`,
