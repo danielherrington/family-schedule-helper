@@ -33,6 +33,7 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
     holidays, 
     currentWeekDays,
     reassignEvent, 
+    rescheduleEvent,
     cancelEventInstance, 
     markNoPickupNeeded,
     restoreEventInstance,
@@ -45,6 +46,86 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
 
   const [selectedChildFilter, setSelectedChildFilter] = useState<string>('all');
   const [holidayModalTargetDate, setHolidayModalTargetDate] = useState<string | null>(null);
+  const [draggingEvent, setDraggingEvent] = useState<DispatchEvent | null>(null);
+  const [dropPreview, setDropPreview] = useState<{
+    dateStr: string;
+    topPercent: number;
+    heightPercent: number;
+    timeStr: string;
+    newStartTime: string;
+    newEndTime: string;
+  } | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, evt: DispatchEvent) => {
+    setDraggingEvent(evt);
+    e.dataTransfer.setData('text/plain', evt.id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragEnd = () => {
+    setDraggingEvent(null);
+    setDropPreview(null);
+  };
+
+  const handleColumnDragOver = (e: React.DragEvent, dateStr: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (!draggingEvent) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const fraction = Math.max(0, Math.min(1, y / rect.height));
+
+    const [sH, sM] = (draggingEvent.startTime || '08:00').split(':').map(Number);
+    const [eH, eM] = (draggingEvent.endTime || draggingEvent.startTime || '08:30').split(':').map(Number);
+    const durMin = Math.max(15, (eH * 60 + eM) - (sH * 60 + sM));
+
+    const windowStart = 7 * 60; // 7:00 AM = 420 min
+    const windowDuration = 12 * 60; // 720 min
+    const rawMin = windowStart + fraction * windowDuration;
+
+    // Snap to 15-minute slot
+    const snappedStartMin = Math.round(rawMin / 15) * 15;
+    const clampedStartMin = Math.max(windowStart, Math.min(19 * 60 - durMin, snappedStartMin));
+    const clampedEndMin = clampedStartMin + durMin;
+
+    const formatM = (m: number) => {
+      const hh = Math.floor(m / 60);
+      const mm = m % 60;
+      return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+    };
+
+    const newStartTime = formatM(clampedStartMin);
+    const newEndTime = formatM(clampedEndMin);
+    const topPercent = ((clampedStartMin - windowStart) / windowDuration) * 100;
+    const heightPercent = (durMin / windowDuration) * 100;
+
+    setDropPreview({
+      dateStr,
+      topPercent,
+      heightPercent,
+      timeStr: `${newStartTime} – ${newEndTime}`,
+      newStartTime,
+      newEndTime
+    });
+  };
+
+  const handleColumnDrop = async (e: React.DragEvent, targetDateStr: string) => {
+    e.preventDefault();
+    if (!draggingEvent || !dropPreview) {
+      setDraggingEvent(null);
+      setDropPreview(null);
+      return;
+    }
+
+    const { newStartTime, newEndTime } = dropPreview;
+    const evtId = draggingEvent.id;
+
+    setDraggingEvent(null);
+    setDropPreview(null);
+
+    await rescheduleEvent(evtId, targetDateStr, newStartTime, newEndTime);
+  };
 
   const weekDays = currentWeekDays.map((d) => ({
     dayName: format(d, 'EEEE'),
@@ -302,12 +383,44 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
               const positionedEvents = layoutDayEvents(dayEvents);
 
               return (
-                <div key={d.dateStr} className="calendar-day-column">
+                <div 
+                  key={d.dateStr} 
+                  className="calendar-day-column"
+                  onDragOver={(e) => handleColumnDragOver(e, d.dateStr)}
+                  onDrop={(e) => handleColumnDrop(e, d.dateStr)}
+                >
                   {/* Holiday Overlay Badge if active */}
                   {dayHoliday && (
                     <div className="column-holiday-banner">
                       <Palmtree size={12} />
                       <span>{dayHoliday.name}</span>
+                    </div>
+                  )}
+
+                  {/* Drag-and-Drop Time Slot Preview Target */}
+                  {dropPreview && dropPreview.dateStr === d.dateStr && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: `${dropPreview.topPercent}%`,
+                        height: `${Math.max(dropPreview.heightPercent, 6.5)}%`,
+                        left: '2px',
+                        right: '2px',
+                        border: '2px dashed var(--primary)',
+                        backgroundColor: 'rgba(0, 180, 216, 0.15)',
+                        borderRadius: '8px',
+                        zIndex: 40,
+                        pointerEvents: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'var(--primary)',
+                        fontWeight: 800,
+                        fontSize: '0.75rem',
+                        boxShadow: '0 4px 12px rgba(0, 180, 216, 0.2)'
+                      }}
+                    >
+                      <span>⏰ {dropPreview.timeStr}</span>
                     </div>
                   )}
 
@@ -325,6 +438,9 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
                     return (
                       <div
                         key={evt.id}
+                        draggable={!isCancelled}
+                        onDragStart={(e) => handleDragStart(e, evt)}
+                        onDragEnd={handleDragEnd}
                         className={`calendar-event-block ${isCancelled ? 'is-cancelled' : ''} ${hasConflict ? 'has-conflict' : ''}`}
                         style={{
                           top: `${topPercent}%`,
@@ -333,6 +449,8 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
                           width: `calc(${colWidthPct}% - 4px)`,
                           borderLeftColor: isCancelled ? '#059669' : isNoPickupNeeded ? '#8B5CF6' : (child?.color || '#FF5E7E'),
                           backgroundColor: '#FFFFFF',
+                          cursor: isCancelled ? 'default' : 'grab',
+                          opacity: draggingEvent?.id === evt.id ? 0.35 : 1,
                           backgroundImage: isCancelled 
                             ? 'linear-gradient(135deg, rgba(5, 150, 105, 0.06), rgba(5, 150, 105, 0.02))'
                             : isNoPickupNeeded
@@ -345,11 +463,12 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
                           className="cal-block-header"
                           style={{ cursor: 'pointer' }}
                           onClick={() => setReassignModalEvent(evt)}
-                          title="Click to view details, reassign, or permanently delete"
+                          title="Click to view details, reassign, or change times"
                         >
                           <span className="cal-block-time">
                             {evt.startTime}
                           </span>
+
                           {hasConflict && (
                             <span className="conflict-badge" title="Driver Double-Booked!">
                               ⚠️ Clash

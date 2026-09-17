@@ -218,12 +218,17 @@ export const SyncReviewModal: React.FC = () => {
             const isNoPickup = item.type === 'no_pickup';
             const isCreate = item.type === 'create';
             const isDelete = item.type === 'delete';
+            const isReschedule = item.type === 'reschedule';
 
             let typeBadgeColor = 'var(--primary)';
             let typeBadgeBg = 'rgba(0, 180, 216, 0.12)';
             let typeLabel = 'DRIVER CHANGE';
 
-            if (isNoPickup) {
+            if (isReschedule) {
+              typeBadgeColor = '#0284c7';
+              typeBadgeBg = 'rgba(2, 132, 199, 0.15)';
+              typeLabel = 'TIME RESCHEDULE';
+            } else if (isNoPickup) {
               typeBadgeColor = 'var(--accent-secondary)';
               typeBadgeBg = 'rgba(255, 183, 3, 0.15)';
               typeLabel = 'NO PICKUP / EXCEPTION';
@@ -236,6 +241,7 @@ export const SyncReviewModal: React.FC = () => {
               typeBadgeBg = 'rgba(230, 57, 70, 0.15)';
               typeLabel = 'DELETE EVENT';
             }
+
 
             return (
               <div
@@ -349,7 +355,20 @@ export const SyncReviewModal: React.FC = () => {
                     </div>
                   )}
 
+                  {isReschedule && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>
+                        {item.previousValue}
+                      </span>
+                      <ArrowRight size={13} color="var(--text-muted)" />
+                      <span style={{ fontWeight: 800, color: '#0284c7' }}>
+                        {item.newValue}
+                      </span>
+                    </div>
+                  )}
+
                   {isNoPickup && (
+
                     <div>
                       <span style={{ fontWeight: 700, color: 'var(--accent-secondary)' }}>Status:</span>{' '}
                       <span>{item.summary}</span>

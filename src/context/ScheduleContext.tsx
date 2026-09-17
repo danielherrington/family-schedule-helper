@@ -77,6 +77,7 @@ interface ScheduleContextType {
   setSelectedDate: (date: string) => void;
   setViewMode: (mode: 'calendar' | 'daily' | 'weekly') => void;
   reassignEvent: (eventId: string, targetCaregiverId: CaregiverId, reason?: string) => Promise<void>;
+  rescheduleEvent: (eventId: string, newDate: string, newStartTime: string, newEndTime: string) => Promise<void>;
   cancelEventInstance: (eventId: string, reason?: string) => Promise<void>;
   markNoPickupNeeded: (eventId: string, reason?: string) => Promise<void>;
   restoreEventInstance: (eventId: string) => Promise<void>;
@@ -606,7 +607,18 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           }
           successCount++;
           successfulItemIds.add(item.id);
+        } else if (item.type === 'reschedule') {
+          const cal = item.sourceCalendarId || item.payload?.sourceCalendarId || activeCalendarId;
+          const currentEvt = events.find((e) => e.id === item.eventId) || item.payload.event;
+          const { date, startTime, endTime } = item.payload.rescheduleData;
+          const timeRes = await GoogleCalendarService.patchEventTime(cal, item.eventId, currentEvt, date, startTime, endTime);
+          if (!timeRes.success) {
+            throw new Error(timeRes.error || `Google Calendar reschedule failed (HTTP ${timeRes.status || 'unknown'})`);
+          }
+          successCount++;
+          successfulItemIds.add(item.id);
         }
+
       } catch (err: any) {
         console.error('Failed to sync item:', item, err);
         errors.push({ summary: item.summary, error: err?.message || 'Sync failed' });
@@ -1006,6 +1018,84 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         })
       });
     } catch (err) {}
+  };
+
+  const rescheduleEvent = async (
+    eventId: string,
+    newDate: string,
+    newStartTime: string,
+    newEndTime: string
+  ) => {
+    const targetEvent = events.find((e) => e.id === eventId);
+    if (!targetEvent) return;
+
+    const oldDate = targetEvent.date;
+    const oldStartTime = targetEvent.startTime;
+    const oldEndTime = targetEvent.endTime;
+
+    if (oldDate === newDate && oldStartTime === newStartTime && oldEndTime === newEndTime) {
+      return;
+    }
+
+    const currentCgId = targetEvent.assignedTo;
+    const cal = targetEvent.sourceCalendarId || caregiverCalendarMappings[currentCgId]?.calendarId || caregiverCalendarMappings['shared']?.calendarId || activeCalendarId;
+    const calName = caregiverCalendarMappings[currentCgId]?.calendarName || (userCalendars.find(c => c.id === cal)?.summary) || 'Current Calendar';
+
+    const updated = events.map((e) => {
+      if (e.id === eventId) {
+        return {
+          ...e,
+          date: newDate,
+          startTime: newStartTime,
+          endTime: newEndTime,
+          isException: e.isRecurringMaster || !!e.masterSeriesId
+        };
+      }
+      return e;
+    });
+
+    setEvents(updated);
+    try {
+      localStorage.setItem('gcal_cached_events_v2', JSON.stringify(updated));
+    } catch (e) {}
+
+    addToast(
+      `✓ Rescheduled "${targetEvent.title}" to ${newDate} (${newStartTime} – ${newEndTime})`,
+      'success'
+    );
+
+    if (GoogleCalendarService.isConnected()) {
+      if (syncMode === 'immediate') {
+        GoogleCalendarService.patchEventTime(cal, eventId, targetEvent, newDate, newStartTime, newEndTime)
+          .catch((e) => console.warn('GCal patch time warning:', e));
+      } else {
+        const staged: StagedSyncItem = {
+          id: `sync-reschedule-${eventId}-${Date.now()}`,
+          type: 'reschedule',
+          eventId,
+          eventTitle: targetEvent.title,
+          childId: targetEvent.childId,
+          eventDate: newDate,
+          eventTime: `${newStartTime} - ${newEndTime}`,
+          summary: `Reschedule: ${targetEvent.title} (${oldStartTime}–${oldEndTime} ➔ ${newStartTime}–${newEndTime})`,
+          previousValue: `${oldDate} (${oldStartTime} – ${oldEndTime})`,
+          newValue: `${newDate} (${newStartTime} – ${newEndTime})`,
+          sourceCalendarId: cal,
+          sourceCalendarName: calName,
+          payload: {
+            sourceCalendarId: cal,
+            event: targetEvent,
+            rescheduleData: {
+              date: newDate,
+              startTime: newStartTime,
+              endTime: newEndTime
+            }
+          },
+          timestamp: Date.now()
+        };
+        updatePendingQueue((prev) => [...prev.filter((p) => !(p.eventId === eventId && p.type === 'reschedule')), staged]);
+      }
+    }
   };
 
   // Cancel Single Event for No Class / Holiday
@@ -1946,6 +2036,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setSelectedDate,
         setViewMode,
         reassignEvent,
+        rescheduleEvent,
         cancelEventInstance,
         markNoPickupNeeded,
         restoreEventInstance,

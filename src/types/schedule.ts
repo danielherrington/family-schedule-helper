@@ -102,7 +102,7 @@ export interface CalendarMapping {
 
 export interface StagedSyncItem {
   id: string;
-  type: 'reassign' | 'no_pickup' | 'create' | 'delete';
+  type: 'reassign' | 'no_pickup' | 'create' | 'delete' | 'reschedule';
   eventId: string;
   eventTitle: string;
   childId: string;
@@ -122,7 +122,7 @@ export interface StagedSyncItem {
 export interface SyncLogEntry {
   id: string;
   timestamp: string; // ISO string
-  action: 'connect' | 'list_calendars' | 'fetch_events' | 'patch_assignment' | 'move_event' | 'no_pickup' | 'create_event' | 'delete_event' | 'error';
+  action: 'connect' | 'list_calendars' | 'fetch_events' | 'patch_assignment' | 'move_event' | 'no_pickup' | 'create_event' | 'delete_event' | 'patch_time' | 'error';
   status: 'success' | 'error' | 'warning' | 'info';
   statusCode?: number;
   summary: string;
@@ -130,3 +130,4 @@ export interface SyncLogEntry {
   calendarId?: string;
   eventId?: string;
 }
+

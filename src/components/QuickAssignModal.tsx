@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSchedule } from '../context/ScheduleContext';
 import { CaregiverId } from '../types/schedule';
-import { Check, Sparkles, Trash2, AlertTriangle, RotateCcw, UserCheck } from 'lucide-react';
+import { Check, Sparkles, Trash2, AlertTriangle, RotateCcw, UserCheck, Clock, Calendar as CalendarIcon } from 'lucide-react';
 import { Modal } from './ui/Modal';
 
 export const QuickAssignModal: React.FC = () => {
@@ -10,6 +10,7 @@ export const QuickAssignModal: React.FC = () => {
     setReassignModalEvent, 
     caregivers, 
     reassignEvent, 
+    rescheduleEvent,
     deletePermanently, 
     deleteSingleEvent,
     caregiverCalendarMappings
@@ -18,14 +19,20 @@ export const QuickAssignModal: React.FC = () => {
   const [selectedCaregiverId, setSelectedCaregiverId] = useState<CaregiverId>(
     reassignModalEvent?.assignedTo || 'daniel'
   );
+  const [eventDate, setEventDate] = useState<string>(reassignModalEvent?.date || '');
+  const [startTime, setStartTime] = useState<string>(reassignModalEvent?.startTime || '08:00');
+  const [endTime, setEndTime] = useState<string>(reassignModalEvent?.endTime || '08:30');
   const [reason, setReason] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<'single' | 'permanent' | null>(null);
 
-  // Sync selected caregiver with the target event whenever modal opens
+  // Sync selected caregiver and times with the target event whenever modal opens
   useEffect(() => {
     if (reassignModalEvent) {
       setSelectedCaregiverId(reassignModalEvent.assignedTo || 'daniel');
+      setEventDate(reassignModalEvent.date || '');
+      setStartTime(reassignModalEvent.startTime || '08:00');
+      setEndTime(reassignModalEvent.endTime || '08:30');
       setReason('');
       setShowDeleteConfirm(null);
     }
@@ -38,11 +45,40 @@ export const QuickAssignModal: React.FC = () => {
   const sourceCalName = caregiverCalendarMappings[currentCgId]?.calendarName || (currentCg ? `${currentCg.name}'s Calendar` : 'Current Calendar');
   const targetCalName = caregiverCalendarMappings[selectedCaregiverId]?.calendarName || (selectedCaregiverId === 'unassigned' ? 'Unassigned' : `${selectedCaregiverId}'s Calendar`);
   const isChangingCaregiver = selectedCaregiverId !== currentCgId;
+  const isTimeChanged = reassignModalEvent.startTime !== startTime || reassignModalEvent.endTime !== endTime || reassignModalEvent.date !== eventDate;
+
+  const shiftTimes = (deltaMinutes: number) => {
+    const parseMin = (t: string) => {
+      const [h, m] = (t || '08:00').split(':').map(Number);
+      return (h || 0) * 60 + (m || 0);
+    };
+    const formatMin = (mins: number) => {
+      const clamped = Math.max(0, Math.min(23 * 60 + 59, mins));
+      const h = Math.floor(clamped / 60);
+      const m = clamped % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    };
+
+    const curStartMin = parseMin(startTime);
+    const curEndMin = parseMin(endTime);
+    const duration = Math.max(15, curEndMin - curStartMin);
+
+    const newStartMin = curStartMin + deltaMinutes;
+    const newEndMin = newStartMin + duration;
+
+    setStartTime(formatMin(newStartMin));
+    setEndTime(formatMin(newEndMin));
+  };
 
   const handleConfirm = async () => {
     try {
       setIsSubmitting(true);
-      await reassignEvent(reassignModalEvent.id, selectedCaregiverId, reason.trim() || undefined);
+      if (isTimeChanged) {
+        await rescheduleEvent(reassignModalEvent.id, eventDate, startTime, endTime);
+      }
+      if (isChangingCaregiver) {
+        await reassignEvent(reassignModalEvent.id, selectedCaregiverId, reason.trim() || undefined);
+      }
       setReassignModalEvent(null);
     } finally {
       setIsSubmitting(false);
@@ -82,11 +118,19 @@ export const QuickAssignModal: React.FC = () => {
     }
   ];
 
+  const submitLabel = isSubmitting 
+    ? 'Syncing...' 
+    : isTimeChanged && isChangingCaregiver 
+    ? 'Confirm Time & Driver' 
+    : isTimeChanged 
+    ? 'Confirm Time Change' 
+    : 'Confirm Reassignment';
+
   return (
     <Modal
       isOpen={!!reassignModalEvent}
       onClose={() => setReassignModalEvent(null)}
-      title="Event Logistics & Assignment"
+      title="Event Logistics & Schedule"
       subtitle={
         <span>
           <strong style={{ color: 'var(--text)' }}>{reassignModalEvent.title}</strong> • {reassignModalEvent.date} ({reassignModalEvent.startTime} – {reassignModalEvent.endTime})
@@ -106,10 +150,10 @@ export const QuickAssignModal: React.FC = () => {
           <button 
             type="button"
             className="btn btn-primary"
-            disabled={isSubmitting}
+            disabled={isSubmitting || (!isChangingCaregiver && !isTimeChanged)}
             onClick={handleConfirm}
           >
-            {isSubmitting ? 'Syncing...' : 'Confirm Reassignment'}
+            {submitLabel}
           </button>
         </>
       }
@@ -131,13 +175,170 @@ export const QuickAssignModal: React.FC = () => {
       >
         <Sparkles size={16} color="var(--primary)" style={{ flexShrink: 0, marginTop: '2px' }} />
         <div>
-          <strong>Atomic Exception:</strong> Selecting a new caregiver updates only <strong>{reassignModalEvent.date}</strong> in Google Calendar. Your master recurring routine blueprint is preserved.
+          <strong>Atomic Exception:</strong> Adjusting times or reassigning updates only this occurrence in Google Calendar. Your master recurring routine blueprint is preserved.
         </div>
+      </div>
+
+      {/* Date & Time Editor Card */}
+      <div 
+        style={{
+          background: 'var(--surface-card)',
+          border: isTimeChanged ? '2px solid var(--primary)' : '1px solid var(--border)',
+          borderRadius: '12px',
+          padding: '12px 14px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '10px'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.88rem', fontWeight: 800 }}>
+            <Clock size={16} color="var(--primary)" />
+            <span>Event Time & Date</span>
+          </div>
+          {isTimeChanged && (
+            <span style={{ fontSize: '0.7rem', fontWeight: 800, background: 'rgba(0, 180, 216, 0.15)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '6px' }}>
+              TIME MODIFIED
+            </span>
+          )}
+        </div>
+
+        {/* Inputs: Date, Start, End */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '10px' }}>
+          <div>
+            <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '3px' }}>
+              Date:
+            </label>
+            <input 
+              type="date"
+              value={eventDate}
+              onChange={(e) => setEventDate(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '7px 8px',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                borderRadius: '6px',
+                border: '1px solid var(--border)',
+                background: 'var(--surface)',
+                color: 'var(--text)'
+              }}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '3px' }}>
+              Start Time:
+            </label>
+            <input 
+              type="time"
+              step="900"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '7px 8px',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                borderRadius: '6px',
+                border: '1px solid var(--border)',
+                background: 'var(--surface)',
+                color: 'var(--text)'
+              }}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '3px' }}>
+              End Time:
+            </label>
+            <input 
+              type="time"
+              step="900"
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '7px 8px',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                borderRadius: '6px',
+                border: '1px solid var(--border)',
+                background: 'var(--surface)',
+                color: 'var(--text)'
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Quick Shift Chips */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', paddingTop: '4px' }}>
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>Quick Shift:</span>
+          {[-30, -15, 15, 30].map((delta) => (
+            <button
+              key={delta}
+              type="button"
+              className="btn"
+              onClick={() => shiftTimes(delta)}
+              style={{
+                fontSize: '0.72rem',
+                padding: '3px 8px',
+                minHeight: '26px',
+                fontWeight: 700,
+                background: 'var(--surface)',
+                color: 'var(--text)'
+              }}
+            >
+              {delta > 0 ? `+${delta}m` : `${delta}m`}
+            </button>
+          ))}
+          {isTimeChanged && (
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                setEventDate(reassignModalEvent.date);
+                setStartTime(reassignModalEvent.startTime);
+                setEndTime(reassignModalEvent.endTime);
+              }}
+              style={{
+                fontSize: '0.72rem',
+                padding: '3px 8px',
+                minHeight: '26px',
+                color: 'var(--danger)',
+                borderColor: 'rgba(239, 68, 68, 0.3)',
+                marginLeft: 'auto'
+              }}
+            >
+              Reset Time
+            </button>
+          )}
+        </div>
+
+        {/* Before / After Diff Display */}
+        {isTimeChanged && (
+          <div 
+            style={{
+              padding: '6px 10px',
+              borderRadius: '6px',
+              background: 'rgba(0, 180, 216, 0.08)',
+              border: '1px solid rgba(0, 180, 216, 0.2)',
+              fontSize: '0.78rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              marginTop: '2px'
+            }}
+          >
+            <span style={{ color: 'var(--text-muted)' }}>{reassignModalEvent.date} ({reassignModalEvent.startTime} – {reassignModalEvent.endTime})</span>
+            <span>➔</span>
+            <strong style={{ color: 'var(--primary)' }}>{eventDate} ({startTime} – {endTime})</strong>
+          </div>
+        )}
       </div>
 
       {/* Calendar Shift Notice if changing caregiver */}
       {isChangingCaregiver && (
         <div 
+
           style={{
             background: 'rgba(255, 94, 126, 0.08)',
             border: '1px solid rgba(255, 94, 126, 0.25)',

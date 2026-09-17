@@ -713,8 +713,108 @@ export class GoogleCalendarService {
   }
 
   /**
+   * Reschedules an event's date and start/end time in Google Calendar
+   */
+  public static async patchEventTime(
+    calendarId: string = 'primary',
+    eventId: string,
+    currentEvent: DispatchEvent,
+    newDate: string,
+    newStartTime: string,
+    newEndTime: string
+  ): Promise<{ success: boolean; status?: number; error?: string }> {
+    const token = this.getStoredToken();
+    if (!token) {
+      const err = 'Google Calendar is not connected. Please connect in Settings.';
+      this.addSyncLog({
+        action: 'patch_time',
+        status: 'error',
+        summary: `Cannot reschedule "${currentEvent.title}": Not connected`,
+        details: err,
+        calendarId,
+        eventId
+      });
+      return { success: false, error: err };
+    }
+
+    if (eventId.startsWith('evt-')) {
+      const err = `Event "${currentEvent.title}" is a local Blueprint placeholder (${eventId}) and does not exist in Google Calendar yet.`;
+      this.addSyncLog({
+        action: 'patch_time',
+        status: 'error',
+        statusCode: 400,
+        summary: `Blocked reschedule: "${currentEvent.title}" is a local placeholder`,
+        details: err,
+        calendarId,
+        eventId
+      });
+      return { success: false, status: 400, error: err };
+    }
+
+    const startIso = `${newDate}T${newStartTime}:00`;
+    const endIso = `${newDate}T${newEndTime}:00`;
+
+    const patchBody = {
+      start: { dateTime: new Date(startIso).toISOString() },
+      end: { dateTime: new Date(endIso).toISOString() }
+    };
+
+    try {
+      const res = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
+        {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(patchBody)
+        }
+      );
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        const errMsg = errJson?.error?.message || `HTTP ${res.status}: ${res.statusText}`;
+        this.addSyncLog({
+          action: 'patch_time',
+          status: 'error',
+          statusCode: res.status,
+          summary: `Failed to reschedule "${currentEvent.title}" (HTTP ${res.status})`,
+          details: errMsg,
+          calendarId,
+          eventId
+        });
+        return { success: false, status: res.status, error: errMsg };
+      }
+
+      this.addSyncLog({
+        action: 'patch_time',
+        status: 'success',
+        statusCode: res.status,
+        summary: `Rescheduled "${currentEvent.title}" ➔ ${newDate} (${newStartTime} – ${newEndTime})`,
+        details: `Updated Google Calendar invite timeslot in place without duplicating.`,
+        calendarId,
+        eventId
+      });
+      return { success: true, status: res.status };
+    } catch (netErr: any) {
+      const errMsg = netErr?.message || 'Network request failed';
+      this.addSyncLog({
+        action: 'patch_time',
+        status: 'error',
+        summary: `Network error rescheduling "${currentEvent.title}"`,
+        details: errMsg,
+        calendarId,
+        eventId
+      });
+      return { success: false, error: errMsg };
+    }
+  }
+
+  /**
    * Adds a new event to Google Calendar
    */
+
   public static async createEvent(
     calendarId: string = 'primary',
     eventData: {
