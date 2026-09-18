@@ -18,6 +18,8 @@ import { AddEventModal } from './components/AddEventModal';
 import { SyncReviewModal } from './components/SyncReviewModal';
 import { ShareDispatchModal } from './components/ShareDispatchModal';
 import { ParentDirectoryModal } from './components/ParentDirectoryModal';
+import { SchoolAlertBanner } from './components/SchoolAlertBanner';
+import { SchoolInboxModal } from './components/SchoolInboxModal';
 import { CheckCircle2, AlertCircle, Info, AlertTriangle } from 'lucide-react';
 
 export const AppContent: React.FC = () => {
@@ -29,6 +31,7 @@ export const AppContent: React.FC = () => {
 
       <main className="main-content">
         <GapAlertBanner />
+        <SchoolAlertBanner />
         <HolidaySuggestionBanner />
         <TravelBanner />
         <WeekStripNavigator />
@@ -60,6 +63,7 @@ export const AppContent: React.FC = () => {
       <SyncReviewModal />
       <ShareDispatchModal />
       <ParentDirectoryModal />
+      <SchoolInboxModal />
 
       {/* Toast System */}
       <div className="toast-container">

@@ -143,3 +143,21 @@ export interface SyncLogEntry {
   eventId?: string;
 }
 
+export interface SchoolCalendarException {
+  id: string;
+  date: string; // YYYY-MM-DD
+  title: string; // e.g. "Friday Early Dismissal (1:15 PM)"
+  schoolName: string; // e.g. "Lehrman Community Day School"
+  childId?: string; // e.g. "isabella"
+  type: 'early_dismissal' | 'school_closed' | 'late_start' | 'special_event';
+  dismissalTime?: string; // "13:15"
+  normalPickupTime?: string; // "15:30"
+  reason?: string;
+  source: 'gmail' | 'manual_paste' | 'ics';
+  sourceSubject?: string;
+  sourceSnippet?: string;
+  applied: boolean;
+  dismissed?: boolean;
+  detectedAt: string;
+}
+

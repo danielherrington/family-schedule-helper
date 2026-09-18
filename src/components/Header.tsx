@@ -19,6 +19,7 @@ import {
   Share2,
   UserCheck,
   Phone,
+  GraduationCap,
   X
 } from 'lucide-react';
 
@@ -50,9 +51,13 @@ export const Header: React.FC = () => {
     setSelectedCaregiverFilter,
     setIsShareDispatchOpen,
     setIsParentDirectoryOpen,
+    schoolExceptions,
+    setIsSchoolInboxOpen,
     openAddEventModal,
     resetToDemoSchedule 
   } = useSchedule();
+
+  const pendingSchoolCount = schoolExceptions.filter((e) => !e.applied && !e.dismissed).length;
 
   const formatDateLabel = (dateStr: string) => {
     const d = new Date(dateStr + 'T12:00:00');
@@ -213,6 +218,38 @@ export const Header: React.FC = () => {
               <span className="hide-mobile">Contacts</span>
             </button>
 
+            {/* School Calendar & Gmail Inbox (DAN-15) */}
+            <button
+              className="btn"
+              onClick={() => setIsSchoolInboxOpen(true)}
+              title="School Calendar & Gmail Inbox Ingestion (Early Dismissals)"
+              style={{
+                borderColor: pendingSchoolCount > 0 ? '#f59e0b' : undefined,
+                color: pendingSchoolCount > 0 ? '#b45309' : undefined,
+                background: pendingSchoolCount > 0 ? 'rgba(245, 158, 11, 0.12)' : undefined,
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}
+            >
+              <GraduationCap size={15} color={pendingSchoolCount > 0 ? '#d97706' : '#f59e0b'} />
+              <span className="hide-mobile">School Inbox</span>
+              {pendingSchoolCount > 0 && (
+                <span
+                  style={{
+                    background: '#f59e0b',
+                    color: '#fff',
+                    borderRadius: '10px',
+                    fontSize: '0.68rem',
+                    padding: '1px 6px',
+                    fontWeight: 800
+                  }}
+                >
+                  {pendingSchoolCount}
+                </span>
+              )}
+            </button>
             {/* 1-Tap Share Daily Dispatch (DAN-9) */}
             <button
               className="btn"

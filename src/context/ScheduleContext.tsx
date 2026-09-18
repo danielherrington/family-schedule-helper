@@ -10,7 +10,8 @@ import {
   DayHoliday,
   StagedSyncItem,
   CaregiverTravel,
-  ParentContact
+  ParentContact,
+  SchoolCalendarException
 } from '../types/schedule';
 import { 
   DEFAULT_CAREGIVERS, 
@@ -20,6 +21,7 @@ import {
   DEFAULT_PARENT_CONTACTS
 } from './defaultSeed';
 import { GoogleCalendarService, GCalUserCalendar } from '../services/googleCalendarClient';
+import { SchoolCalendarService } from '../services/schoolCalendarService';
 import { isTodayOrUpcoming, getTodayDateStr } from '../utils/dateUtils';
 import { 
   saveSharedBlueprints, 
@@ -119,6 +121,15 @@ interface ScheduleContextType {
   deleteParentContact: (id: string) => Promise<void>;
   isParentDirectoryOpen: boolean;
   setIsParentDirectoryOpen: (open: boolean) => void;
+
+  // School Calendar & Gmail Ingestion (DAN-15)
+  schoolExceptions: SchoolCalendarException[];
+  isSchoolInboxOpen: boolean;
+  setIsSchoolInboxOpen: (open: boolean) => void;
+  applySchoolException: (exceptionId: string) => Promise<void>;
+  dismissSchoolException: (exceptionId: string) => void;
+  addSchoolException: (notice: SchoolCalendarException) => Promise<void>;
+  scanSchoolInbox: () => Promise<{ success: boolean; foundCount: number; message: string }>;
 
   changeDateByDays: (days: number) => void;
 
@@ -574,6 +585,21 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     addToast('Contact removed.', 'info');
   };
 
+  // School Calendar Ingestion & Exceptions (DAN-15)
+  const [schoolExceptions, setSchoolExceptions] = useState<SchoolCalendarException[]>(() => {
+    return SchoolCalendarService.getStoredExceptions();
+  });
+  const [isSchoolInboxOpen, setIsSchoolInboxOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleUpdated = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) {
+        setSchoolExceptions(e.detail);
+      }
+    };
+    window.addEventListener('school_exceptions_updated', handleUpdated);
+    return () => window.removeEventListener('school_exceptions_updated', handleUpdated);
+  }, []);
   // Staged Sync State ("Safe Mode")
   const [syncMode, setSyncModeState] = useState<'staged' | 'immediate'>(() => {
     return (localStorage.getItem('gcal_sync_mode') as 'staged' | 'immediate') || 'staged';
@@ -1910,6 +1936,101 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } catch (err) {}
   };
 
+  // School Calendar Ingestion & Exception Handlers (DAN-15)
+  const applySchoolException = async (exceptionId: string) => {
+    const exc = schoolExceptions.find((e) => e.id === exceptionId);
+    if (!exc) return;
+
+    if (exc.type === 'early_dismissal' && exc.dismissalTime) {
+      const matchingEvents = events.filter((e) => {
+        if (e.date !== exc.date) return false;
+        if (e.status === 'cancelled') return false;
+        const isPickup = e.category === 'pickup' || e.title.toLowerCase().includes('pickup') || e.title.toLowerCase().includes('dismissal');
+        const isMatchingChild = !exc.childId || e.childId === exc.childId || exc.childId === 'all';
+        return isPickup && isMatchingChild;
+      });
+
+      if (matchingEvents.length > 0) {
+        for (const ev of matchingEvents) {
+          const [h, m] = exc.dismissalTime.split(':').map(Number);
+          const endMinutes = h * 60 + m + 30;
+          const endH = Math.floor(endMinutes / 60) % 24;
+          const endM = endMinutes % 60;
+          const newEndTime = `${endH.toString().padStart(2, '0')}:${endM.toString().padStart(2, '0')}`;
+
+          await rescheduleEvent(ev.id, exc.date, exc.dismissalTime, newEndTime);
+        }
+        addToast(`🎒 Applied Early Dismissal: Pickup shifted to ${exc.dismissalTime} on ${exc.date}`, 'success');
+      } else {
+        const [h, m] = exc.dismissalTime.split(':').map(Number);
+        const endMinutes = h * 60 + m + 30;
+        const endH = Math.floor(endMinutes / 60) % 24;
+        const endM = endMinutes % 60;
+        const newEndTime = `${endH.toString().padStart(2, '0')}:${endM.toString().padStart(2, '0')}`;
+
+        await addNewEvent({
+          title: `School Pickup (${exc.schoolName || 'Lehrman'})`,
+          childId: exc.childId || 'isabella',
+          category: 'pickup',
+          date: exc.date,
+          startTime: exc.dismissalTime,
+          endTime: newEndTime,
+          location: exc.schoolName || 'Lehrman Community Day School',
+          assignedTo: 'daniel',
+          notes: `Early dismissal notice from school inbox: ${exc.reason || 'Shabbat / Early Dismissal'}`
+        });
+        addToast(`🎒 Created early dismissal pickup at ${exc.dismissalTime} on ${exc.date}`, 'success');
+      }
+    } else if (exc.type === 'school_closed') {
+      const schoolEvents = events.filter((e) => {
+        if (e.date !== exc.date) return false;
+        if (e.status === 'cancelled') return false;
+        const isSchool = e.category === 'dropoff' || e.category === 'pickup' || e.location.toLowerCase().includes('lehrman') || e.location.toLowerCase().includes('school');
+        const isMatchingChild = !exc.childId || e.childId === exc.childId || exc.childId === 'all';
+        return isSchool && isMatchingChild;
+      });
+
+      for (const ev of schoolEvents) {
+        await cancelEventInstance(ev.id, `School Closed: ${exc.title}`);
+      }
+      addToast(`🎒 School Closed on ${exc.date}: Cancelled school runs (Moe walks preserved)`, 'info');
+    }
+
+    const updated = schoolExceptions.map((item) =>
+      item.id === exceptionId ? { ...item, applied: true, dismissed: true } : item
+    );
+    setSchoolExceptions(updated);
+    SchoolCalendarService.saveStoredExceptions(updated);
+  };
+
+  const dismissSchoolException = (exceptionId: string) => {
+    const updated = schoolExceptions.map((item) =>
+      item.id === exceptionId ? { ...item, dismissed: true } : item
+    );
+    setSchoolExceptions(updated);
+    SchoolCalendarService.saveStoredExceptions(updated);
+    addToast('School alert dismissed', 'info');
+  };
+
+  const addSchoolException = async (notice: SchoolCalendarException) => {
+    const updated = [notice, ...schoolExceptions];
+    setSchoolExceptions(updated);
+    SchoolCalendarService.saveStoredExceptions(updated);
+    addToast(`Added school exception for ${notice.date}`, 'success');
+  };
+
+  const scanSchoolInbox = async () => {
+    setIsLoading(true);
+    try {
+      const res = await SchoolCalendarService.scanGmailInbox();
+      setSchoolExceptions(SchoolCalendarService.getStoredExceptions());
+      addToast(res.message, res.newExceptions.length > 0 ? 'success' : 'info');
+      return res;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Permanently Delete Event from all weeks and blueprint
   const deletePermanently = async (eventId: string) => {
     const targetEvent = events.find((e) => e.id === eventId);
@@ -2172,6 +2293,13 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         deleteParentContact,
         isParentDirectoryOpen,
         setIsParentDirectoryOpen,
+        schoolExceptions,
+        isSchoolInboxOpen,
+        setIsSchoolInboxOpen,
+        applySchoolException,
+        dismissSchoolException,
+        addSchoolException,
+        scanSchoolInbox,
         changeDateByDays,
         userCalendars,
         activeCalendarId,
