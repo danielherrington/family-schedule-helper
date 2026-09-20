@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useSchedule } from '../context/ScheduleContext';
 import { getHolidaysForDates, HolidayInfo } from '../utils/holidayEngine';
-import { Palmtree, Sparkles, X, Check, Calendar } from 'lucide-react';
+import { Palmtree, Sparkles, X, Check, Calendar, RotateCcw } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { isTodayOrUpcoming } from '../utils/dateUtils';
 
 export const HolidaySuggestionBanner: React.FC = () => {
-  const { currentWeekDays, holidays, markDayAsHoliday } = useSchedule();
+  const { currentWeekDays, holidays, markDayAsHoliday, unmarkDayHoliday } = useSchedule();
   const [dismissedHolidays, setDismissedHolidays] = useState<string[]>([]);
   const [applyingDate, setApplyingDate] = useState<string | null>(null);
 
@@ -21,7 +21,10 @@ export const HolidaySuggestionBanner: React.FC = () => {
     return !isAlreadyMarked && !isDismissed && isUpcoming;
   });
 
-  if (pendingHolidays.length === 0) return null;
+  // Find holidays in the active week that ARE marked
+  const markedHolidaysInWeek = holidaysInWeek.filter((h) => holidays.some((hm) => hm.date === h.date));
+
+  if (pendingHolidays.length === 0 && markedHolidaysInWeek.length === 0) return null;
 
   const handleApply = async (h: HolidayInfo) => {
     setApplyingDate(h.date);
@@ -38,6 +41,75 @@ export const HolidaySuggestionBanner: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+      {/* Active Marked Holidays with 1-Tap Undo */}
+      {markedHolidaysInWeek.map((h) => {
+        const matchingHoliday = holidays.find((hm) => hm.date === h.date);
+        const formattedDate = format(parseISO(h.date), 'EEEE, MMM d');
+        return (
+          <div
+            key={`marked-${h.date}`}
+            style={{
+              background: 'rgba(16, 185, 129, 0.08)',
+              border: '1px solid rgba(16, 185, 129, 0.35)',
+              borderRadius: '12px',
+              padding: '10px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              flexWrap: 'wrap',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '8px',
+                  background: 'rgba(16, 185, 129, 0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#10b981',
+                  flexShrink: 0
+                }}
+              >
+                <Palmtree size={18} />
+              </div>
+              <div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text)' }}>
+                  🌴 Marked as Day Off: {matchingHoliday?.name || h.name}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  {formattedDate} • Pickups & drop-offs cancelled (Moe walks active)
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="btn"
+              style={{
+                borderColor: 'var(--danger)',
+                color: 'var(--danger)',
+                background: 'rgba(225, 29, 72, 0.08)',
+                fontSize: '0.78rem',
+                padding: '5px 12px',
+                minHeight: '34px',
+                fontWeight: 700
+              }}
+              onClick={() => unmarkDayHoliday(h.date)}
+              title="Undo day off and restore duties"
+            >
+              <RotateCcw size={14} />
+              <span>Undo Day Off & Restore Duties</span>
+            </button>
+          </div>
+        );
+      })}
+
+      {/* Suggested Holidays */}
       {pendingHolidays.map((h) => {
         const formattedDate = format(parseISO(h.date), 'EEEE, MMM d');
         const badgeColor = h.category === 'jewish' ? '#8b5cf6' : '#3b82f6';

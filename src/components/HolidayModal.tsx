@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSchedule } from '../context/ScheduleContext';
 import { getHolidayForDate, CATEGORIZED_HOLIDAY_PRESETS } from '../utils/holidayEngine';
-import { Palmtree, Sparkles, Check } from 'lucide-react';
+import { Palmtree, Sparkles, Check, RotateCcw } from 'lucide-react';
 import { Modal } from './ui/Modal';
 
 interface HolidayModalProps {
@@ -11,25 +11,33 @@ interface HolidayModalProps {
 }
 
 export const HolidayModal: React.FC<HolidayModalProps> = ({ isOpen, onClose, targetDateStr }) => {
-  const { markDayAsHoliday, children: childrenList } = useSchedule();
+  const { markDayAsHoliday, unmarkDayHoliday, holidays, children: childrenList } = useSchedule();
   const [holidayName, setHolidayName] = useState('School Holiday / No Classes');
   const [selectedChildId, setSelectedChildId] = useState('all');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<'jewish' | 'federal' | 'school'>('jewish');
 
-  // If the target date has a recognized holiday, prefill it!
+  const existingHoliday = holidays.find((h) => h.date === targetDateStr);
+
+  // If the target date has a recognized holiday or existing marked holiday, prefill it!
   useEffect(() => {
     if (targetDateStr) {
-      const known = getHolidayForDate(targetDateStr);
-      if (known) {
-        setHolidayName(`${known.name} (No School)`);
-        if (known.category === 'jewish') setActiveTab('jewish');
-        else if (known.category === 'federal') setActiveTab('federal');
+      const existing = holidays.find((h) => h.date === targetDateStr);
+      if (existing) {
+        setHolidayName(existing.name);
+        if (existing.childId) setSelectedChildId(existing.childId);
       } else {
-        setHolidayName('School Holiday / No Classes');
+        const known = getHolidayForDate(targetDateStr);
+        if (known) {
+          setHolidayName(`${known.name} (No School)`);
+          if (known.category === 'jewish') setActiveTab('jewish');
+          else if (known.category === 'federal') setActiveTab('federal');
+        } else {
+          setHolidayName('School Holiday / No Classes');
+        }
       }
     }
-  }, [targetDateStr, isOpen]);
+  }, [targetDateStr, isOpen, holidays]);
 
   if (!isOpen) return null;
 
@@ -45,40 +53,118 @@ export const HolidayModal: React.FC<HolidayModalProps> = ({ isOpen, onClose, tar
     }
   };
 
+  const handleRemove = async () => {
+    try {
+      setIsSubmitting(true);
+      await unmarkDayHoliday(targetDateStr);
+      onClose();
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Mark Holiday / Day Off"
+      title={existingHoliday ? "Manage Holiday / Day Off" : "Mark Holiday / Day Off"}
       subtitle={
         <span>
-          Target Date: <strong>{targetDateStr}</strong>
+          Target Date: <strong>{targetDateStr}</strong> {existingHoliday ? `(Currently Marked: ${existingHoliday.name})` : ''}
         </span>
       }
-      icon={<Palmtree size={22} color="#10b981" />}
+      icon={<Palmtree size={22} color={existingHoliday ? "#ef4444" : "#10b981"} />}
       size="md"
       footer={
-        <>
-          <button 
-            type="button"
-            className="btn" 
-            onClick={onClose}
-          >
-            Cancel
-          </button>
-          <button 
-            type="button"
-            className="btn btn-primary"
-            style={{ background: '#10b981', borderColor: '#10b981' }}
-            disabled={isSubmitting || !holidayName.trim()}
-            onClick={handleConfirm}
-          >
-            <Check size={16} />
-            <span>{isSendingSubmit(isSubmitting)}</span>
-          </button>
-        </>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: '8px' }}>
+          <div>
+            {existingHoliday && (
+              <button 
+                type="button"
+                className="btn" 
+                style={{
+                  borderColor: 'var(--danger)',
+                  color: 'var(--danger)',
+                  background: 'rgba(225, 29, 72, 0.08)',
+                  fontWeight: 700
+                }}
+                disabled={isSubmitting}
+                onClick={handleRemove}
+                title="Unmark this holiday and restore all cancelled duties"
+              >
+                <RotateCcw size={15} />
+                <span>Remove Holiday & Restore Duties</span>
+              </button>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
+            <button 
+              type="button"
+              className="btn" 
+              onClick={onClose}
+            >
+              Cancel
+            </button>
+            <button 
+              type="button"
+              className="btn btn-primary"
+              style={{ background: '#10b981', borderColor: '#10b981' }}
+              disabled={isSubmitting || !holidayName.trim()}
+              onClick={handleConfirm}
+            >
+              <Check size={16} />
+              <span>{existingHoliday ? 'Update Holiday' : isSendingSubmit(isSubmitting)}</span>
+            </button>
+          </div>
+        </div>
       }
     >
+      {/* Existing Marked Holiday Banner */}
+      {existingHoliday && (
+        <div
+          style={{
+            background: 'rgba(239, 68, 68, 0.08)',
+            border: '1px solid rgba(239, 68, 68, 0.35)',
+            borderRadius: '10px',
+            padding: '12px 14px',
+            fontSize: '0.85rem',
+            color: '#b91c1c',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '10px',
+            flexWrap: 'wrap'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Palmtree size={18} style={{ flexShrink: 0, color: '#dc2626' }} />
+            <div>
+              <strong>Currently marked as Day Off:</strong> "{existingHoliday.name}"
+              <div style={{ fontSize: '0.78rem', color: '#991b1b', marginTop: '2px' }}>
+                Pickup & drop-off duties are cancelled. Click below to unmark and restore schedule.
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="btn"
+            style={{
+              borderColor: '#dc2626',
+              color: '#dc2626',
+              background: '#fff',
+              fontSize: '0.78rem',
+              padding: '4px 10px',
+              minHeight: '32px',
+              fontWeight: 700
+            }}
+            disabled={isSubmitting}
+            onClick={handleRemove}
+          >
+            <RotateCcw size={13} />
+            <span>Restore Duties</span>
+          </button>
+        </div>
+      )}
       {/* Detected Holiday Callout */}
       {detectedHoliday && (
         <div

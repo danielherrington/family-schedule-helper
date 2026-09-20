@@ -92,6 +92,7 @@ interface ScheduleContextType {
   ) => Promise<void>;
   restoreEventInstance: (eventId: string) => Promise<void>;
   markDayAsHoliday: (dateStr: string, holidayName: string, childId?: string) => Promise<void>;
+  unmarkDayHoliday: (dateStr: string) => Promise<void>;
   setReassignModalEvent: (event: DispatchEvent | null) => void;
   setIsSettingsOpen: (open: boolean) => void;
   setIsAuditLogOpen: (open: boolean) => void;
@@ -1415,6 +1416,43 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } catch (err) {}
   };
 
+  // Unmark Full Day as Holiday & Restore Scheduled Duties
+  const unmarkDayHoliday = async (dateStr: string) => {
+    let restoredCount = 0;
+    const updated = events.map((e) => {
+      if (e.date === dateStr && e.status === 'cancelled') {
+        restoredCount++;
+        return {
+          ...e,
+          status: (e.assignedTo === 'unassigned' ? 'unassigned' : 'confirmed') as 'confirmed' | 'unassigned',
+          isException: false,
+          cancellationReason: undefined
+        };
+      }
+      return e;
+    });
+
+    setEvents(updated);
+    try {
+      localStorage.setItem('gcal_cached_events_v2', JSON.stringify(updated));
+    } catch {}
+
+    setHolidays((prev) => prev.filter((h) => h.date !== dateStr));
+
+    const toastMsg = restoredCount > 0
+      ? `🌴 Removed holiday for ${dateStr} (${restoredCount} duties restored)`
+      : `🌴 Removed holiday for ${dateStr}`;
+    addToast(toastMsg, 'success');
+
+    try {
+      await fetch('/api/schedule/unmark-day-holiday', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dateStr })
+      });
+    } catch (err) {}
+  };
+
   // Caregiver Out-of-Town / Travel Management
   const isCaregiverOutOfTown = (caregiverId: string, dateStr: string): boolean => {
     return caregiverTravels.some(
@@ -2266,6 +2304,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         markNoPickupNeeded,
         restoreEventInstance,
         markDayAsHoliday,
+        unmarkDayHoliday,
         setReassignModalEvent,
         setIsSettingsOpen,
         setIsAuditLogOpen,

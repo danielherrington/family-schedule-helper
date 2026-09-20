@@ -201,6 +201,30 @@ export class RecurrenceEngine {
   }
 
   /**
+   * Unmarks all events for a given day as a School Holiday and restores duties
+   */
+  public static unmarkDayHoliday(
+    eventsList: any[],
+    date: string
+  ): { updatedEvents: any[]; restoredCount: number } {
+    let restoredCount = 0;
+    const updatedEvents = eventsList.map((e) => {
+      if (e.date === date && e.status === 'cancelled') {
+        restoredCount++;
+        return {
+          ...e,
+          status: e.assignedTo === 'unassigned' ? 'unassigned' : 'confirmed',
+          isException: false,
+          cancellationReason: undefined
+        };
+      }
+      return e;
+    });
+
+    return { updatedEvents, restoredCount };
+  }
+
+  /**
    * Permanently removes an event template and all its recurring instances from the schedule
    */
   public static deletePermanently(

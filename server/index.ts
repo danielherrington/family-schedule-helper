@@ -543,6 +543,30 @@ app.post('/api/schedule/mark-day-holiday', (req, res) => {
   }
 });
 
+// Unmark Whole Day as Holiday & Restore Duties
+app.post('/api/schedule/unmark-day-holiday', (req, res) => {
+  try {
+    const { date } = req.body;
+    if (!date) return res.status(400).json({ error: 'date is required' });
+
+    holidaysState = holidaysState.filter((h) => h.date !== date);
+    const { updatedEvents, restoredCount } = RecurrenceEngine.unmarkDayHoliday(eventsState, date);
+    eventsState = updatedEvents;
+
+    auditLog.unshift({
+      success: true,
+      date,
+      actionTaken: 'restored',
+      message: `Unmarked ${date} as holiday: ${restoredCount} duties restored.`,
+      timestamp: new Date().toISOString()
+    });
+
+    res.json({ success: true, restoredCount, date, events: eventsState });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to unmark holiday' });
+  }
+});
+
 app.get('/api/schedule/gaps', (req, res) => {
   const dateQuery = req.query.date as string;
   const gaps = RecurrenceEngine.detectGaps(eventsState, dateQuery);

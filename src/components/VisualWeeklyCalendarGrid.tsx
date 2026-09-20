@@ -15,7 +15,8 @@ import {
   AlertTriangle,
   AlertCircle,
   Plus,
-  Share2
+  Share2,
+  X
 } from 'lucide-react';
 
 interface PositionedEvent {
@@ -38,6 +39,7 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
     cancelEventInstance, 
     markNoPickupNeeded,
     restoreEventInstance,
+    unmarkDayHoliday,
     applyWeeklyBlueprint,
     setSelectedDate,
     setViewMode,
@@ -438,9 +440,43 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
                 >
                   {/* Holiday Overlay Badge if active */}
                   {dayHoliday && (
-                    <div className="column-holiday-banner">
-                      <Palmtree size={12} />
-                      <span>{dayHoliday.name}</span>
+                    <div 
+                      className="column-holiday-banner"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '6px',
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => setHolidayModalTargetDate(d.dateStr)}
+                      title={`Holiday: ${dayHoliday.name}. Click to edit or click ✕ to restore duties.`}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <Palmtree size={12} style={{ flexShrink: 0 }} />
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{dayHoliday.name}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          unmarkDayHoliday(d.dateStr);
+                        }}
+                        title="Remove holiday and restore duties"
+                        style={{
+                          background: 'rgba(0, 0, 0, 0.25)',
+                          border: 'none',
+                          borderRadius: '4px',
+                          color: '#fff',
+                          padding: '2px 4px',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          flexShrink: 0
+                        }}
+                      >
+                        <X size={11} />
+                      </button>
                     </div>
                   )}
 

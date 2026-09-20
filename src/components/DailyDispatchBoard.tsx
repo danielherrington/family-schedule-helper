@@ -14,7 +14,8 @@ import {
   Moon,
   Sparkles,
   Share2,
-  User
+  User,
+  RotateCcw
 } from 'lucide-react';
 import { getHolidayForDate } from '../utils/holidayEngine';
 import { isTodayOrUpcoming } from '../utils/dateUtils';
@@ -31,6 +32,7 @@ export const DailyDispatchBoard: React.FC = () => {
     setIsSetupOpen, 
     setActiveSetupTab,
     openAddEventModal,
+    unmarkDayHoliday,
     selectedCaregiverFilter,
     setSelectedCaregiverFilter,
     setIsShareDispatchOpen
@@ -206,19 +208,36 @@ export const DailyDispatchBoard: React.FC = () => {
             <span>Add Event</span>
           </button>
 
-          <button
-            className="btn"
-            style={{
-              borderColor: detectedHoliday ? 'rgba(139, 92, 246, 0.5)' : 'rgba(16, 185, 129, 0.4)',
-              color: detectedHoliday ? '#c4b5fd' : '#10b981',
-              background: detectedHoliday ? 'rgba(139, 92, 246, 0.12)' : undefined
-            }}
-            onClick={() => setIsHolidayModalOpen(true)}
-            title={detectedHoliday ? `Recognized: ${detectedHoliday.name}` : "Mark this day as a holiday or no classes"}
-          >
-            <Palmtree size={15} />
-            <span>{detectedHoliday ? `Mark ${detectedHoliday.name.split('—')[0].trim()}` : 'Mark Holiday'}</span>
-          </button>
+          {holidays.find((h) => h.date === selectedDate) ? (
+            <button
+              className="btn"
+              style={{
+                borderColor: 'var(--danger)',
+                color: 'var(--danger)',
+                background: 'rgba(225, 29, 72, 0.08)',
+                fontWeight: 700
+              }}
+              onClick={() => unmarkDayHoliday(selectedDate)}
+              title={`Day currently marked as holiday: ${holidays.find((h) => h.date === selectedDate)?.name}. Click to restore duties.`}
+            >
+              <RotateCcw size={15} />
+              <span>Restore Duties</span>
+            </button>
+          ) : (
+            <button
+              className="btn"
+              style={{
+                borderColor: detectedHoliday ? 'rgba(139, 92, 246, 0.5)' : 'rgba(16, 185, 129, 0.4)',
+                color: detectedHoliday ? '#c4b5fd' : '#10b981',
+                background: detectedHoliday ? 'rgba(139, 92, 246, 0.12)' : undefined
+              }}
+              onClick={() => setIsHolidayModalOpen(true)}
+              title={detectedHoliday ? `Recognized: ${detectedHoliday.name}` : "Mark this day as a holiday or no classes"}
+            >
+              <Palmtree size={15} />
+              <span>{detectedHoliday ? `Mark ${detectedHoliday.name.split('—')[0].trim()}` : 'Mark Holiday'}</span>
+            </button>
+          )}
         </div>
 
         {/* Driver / Caregiver Filter Selector (DAN-10) */}
