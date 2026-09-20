@@ -261,8 +261,8 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
   return (
     <div className="visual-calendar-wrapper">
       {/* Top Filter & Blueprint Bar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px', maxWidth: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', minWidth: 0, flex: 1 }}>
           {/* Kids Filter */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <Filter size={16} color="var(--text-muted)" />
@@ -329,16 +329,7 @@ export const VisualWeeklyCalendarGrid: React.FC = () => {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            className="btn"
-            style={{ borderColor: '#25D366', color: '#25D366' }}
-            onClick={() => setIsShareDispatchOpen(true)}
-            title="Share Schedule via WhatsApp / iMessage"
-          >
-            <Share2 size={15} color="#25D366" />
-            <span>Share</span>
-          </button>
+        <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
           <button 
             className="btn"
             onClick={() => applyWeeklyBlueprint(weekDays[0].dateStr)}

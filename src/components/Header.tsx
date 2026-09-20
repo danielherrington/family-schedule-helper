@@ -93,7 +93,7 @@ export const Header: React.FC = () => {
               <Calendar size={20} />
             </div>
             <div>
-              <div className="brand-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div className="brand-title">
                 <span>Los Herringtons</span>
                 <span className="brand-badge">🌴 Miami</span>
                 <span 
@@ -188,7 +188,7 @@ export const Header: React.FC = () => {
               style={{ fontWeight: 700 }}
             >
               <Users size={16} />
-              <span className="hide-mobile">Family Setup</span>
+              <span className="hide-laptop">Family Setup</span>
             </button>
 
             {/* Out of Town / Travel Coverage Button */}
@@ -204,7 +204,7 @@ export const Header: React.FC = () => {
               }}
             >
               <Plane size={15} />
-              <span className="hide-mobile">Out of Town{caregiverTravels.length > 0 ? ` (${caregiverTravels.length})` : ''}</span>
+              <span className="hide-laptop">Out of Town{caregiverTravels.length > 0 ? ` (${caregiverTravels.length})` : ''}</span>
             </button>
 
             {/* Playdate & Carpool Parent Contact Directory (DAN-14) */}
@@ -215,7 +215,7 @@ export const Header: React.FC = () => {
               style={{ fontWeight: 700 }}
             >
               <Phone size={14} color="#7928CA" />
-              <span className="hide-mobile">Contacts</span>
+              <span className="hide-desktop-compact">Contacts</span>
             </button>
 
             {/* School Calendar & Gmail Inbox (DAN-15) */}
@@ -234,7 +234,7 @@ export const Header: React.FC = () => {
               }}
             >
               <GraduationCap size={15} color={pendingSchoolCount > 0 ? '#d97706' : '#f59e0b'} />
-              <span className="hide-mobile">School Inbox</span>
+              <span className="hide-laptop">School Inbox</span>
               {pendingSchoolCount > 0 && (
                 <span
                   style={{
@@ -250,6 +250,7 @@ export const Header: React.FC = () => {
                 </span>
               )}
             </button>
+
             {/* 1-Tap Share Daily Dispatch (DAN-9) */}
             <button
               className="btn"
@@ -266,7 +267,7 @@ export const Header: React.FC = () => {
               }}
             >
               <Share2 size={15} color="#25D366" />
-              <span className="hide-mobile">Share</span>
+              <span className="hide-desktop-compact">Share</span>
             </button>
 
             {gaps.length > 0 && (
@@ -281,10 +282,10 @@ export const Header: React.FC = () => {
               className="btn" 
               onClick={() => setIsSundayAlertOpen(true)}
               title="Configure Sunday Night Schedule Reminder"
+              aria-label="Sunday Night Schedule Reminder"
               style={{ borderColor: 'rgba(255, 94, 126, 0.4)', color: 'var(--accent)' }}
             >
               <Bell size={15} />
-              <span className="hide-tablet">Sunday Alert</span>
             </button>
 
             {/* Audit Log Trigger */}
@@ -292,9 +293,9 @@ export const Header: React.FC = () => {
               className="btn" 
               onClick={() => setIsAuditLogOpen(true)}
               title="View Single-Instance Exceptions Audit Log"
+              aria-label="View Single-Instance Exceptions Audit Log"
             >
               <FileText size={16} />
-              <span className="hide-tablet">Audit</span>
             </button>
 
             {/* Settings Modal / Google Sync Status */}
@@ -302,6 +303,7 @@ export const Header: React.FC = () => {
               className="btn" 
               onClick={() => setIsSettingsOpen(true)}
               title={authStatus.mode === 'live_gcal' ? `Connected to Google Calendar (${connectedEmail || 'Live'})` : "Connect Google Calendar"}
+              aria-label="Google Calendar Sync Settings"
               style={{
                 borderColor: authStatus.mode === 'live_gcal' ? 'var(--success)' : undefined,
                 color: authStatus.mode === 'live_gcal' ? 'var(--success)' : undefined,
@@ -310,7 +312,6 @@ export const Header: React.FC = () => {
               }}
             >
               <Settings size={16} />
-              <span className="hide-tablet">{authStatus.mode === 'live_gcal' ? '● Live' : 'Sync'}</span>
             </button>
 
             {/* Reset Demo */}
@@ -318,6 +319,7 @@ export const Header: React.FC = () => {
               className="btn" 
               onClick={resetToDemoSchedule}
               title="Reset to Original Schedule Demo"
+              aria-label="Reset to Original Schedule Demo"
             >
               <RotateCcw size={16} />
             </button>
